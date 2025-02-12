@@ -75,7 +75,7 @@ export default function RootLayout({
                   🧱 Structured Output
                 </ActiveLink>
                 <ActiveLink href="/agents">🦜 Agents</ActiveLink>
-                <ActiveLink href="/retrieval">🐶 Retrieval</ActiveLink>
+                <ActiveLink href="/retrieval">ChatPPC</ActiveLink>
                 <ActiveLink href="/retrieval_agents">
                   🤖 Retrieval Agents
                 </ActiveLink>
