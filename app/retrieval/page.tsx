@@ -8,7 +8,7 @@ export default function Home() {
         <li className="text-l">
           💻💬
           <span className="ml-2">
-            This a simple ChatGPT window--use it as you like! Click on ChatPPC above to access the clinic's ChatBot.{" "}
+            This a simple ChatGPT window--use it as you like! Click on ChatPPC above to access the clinic&apos;s ChatBot.
           </span>
         </li>
       </ul>
