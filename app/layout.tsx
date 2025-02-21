@@ -61,38 +61,27 @@ export default function RootLayout({
         <div className="bg-secondary grid grid-rows-[auto,1fr] h-[100dvh]">
           <div className="grid grid-cols-[1fr,auto] gap-2 p-4">
             <div className="flex gap-4 flex-col md:flex-row md:items-center">
-              <a
+              {/* <a
                 href="https://js.langchain.com"
                 rel="noopener noreferrer"
                 target="_blank"
                 className="flex items-center gap-2"
               >
                 <Logo />
-              </a>
+              </a> */}
               <nav className="flex gap-1 flex-col md:flex-row">
-                <ActiveLink href="/">🏴‍☠️ Chat</ActiveLink>
-                <ActiveLink href="/structured_output">
-                  🧱 Structured Output
-                </ActiveLink>
-                <ActiveLink href="/agents">🦜 Agents</ActiveLink>
+                <ActiveLink href="/">General Chat</ActiveLink>
                 <ActiveLink href="/retrieval">ChatPPC</ActiveLink>
-                <ActiveLink href="/retrieval_agents">
-                  🤖 Retrieval Agents
-                </ActiveLink>
-                <ActiveLink href="/ai_sdk">
-                  🌊 LangChain x AI SDK RSC
-                </ActiveLink>
               </nav>
             </div>
 
             <div className="flex justify-center">
               <Button asChild variant="outline" size="default">
                 <a
-                  href="https://github.com/langchain-ai/langchain-nextjs-template"
+                  href="https://med.stanford.edu/ppc.html"
                   target="_blank"
                 >
-                  <GithubIcon className="size-3" />
-                  <span>Open in GitHub</span>
+                  <span>Go to PPC Website</span>
                 </a>
               </Button>
             </div>

@@ -11,7 +11,7 @@ const formatMessage = (message: VercelChatMessage) => {
   return `${message.role}: ${message.content}`;
 };
 
-const TEMPLATE = `You are a pirate named Patchy. All responses must be extremely verbose and in pirate dialect.
+const TEMPLATE = `Simply respond to the questions that people ask. If they ask anything about clinical workflows, remind them to click on "ChatPPC" above to access the clinic Chat tool.
 
 Current conversation:
 {chat_history}
