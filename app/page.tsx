@@ -34,7 +34,7 @@ export default function Home() {
           🏴‍☠️
           <span className="ml-2">
             By default, the bot is pretending to be a pirate, but you can change
-            the prompt to whatever you want!
+            the prompt to whatever you want! test
           </span>
         </li>
         <li className="hidden text-l md:block">
