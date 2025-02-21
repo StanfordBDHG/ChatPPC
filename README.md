@@ -23,13 +23,48 @@ cd <project-directory>
 yarn install
 ```
 
-3. Follow [these instructions](https://js.langchain.com/docs/integrations/vectorstores/supabase/) to set up a Supabase database as a vector store and connect it to this project.
+3. Set up your Supabase database by following [these instructions](https://js.langchain.com/docs/integrations/vectorstores/supabase) to:
+   - Enable the `pgvector` extension
+   - Create the necessary tables and functions
 
-3. Create a `.env.local` file in the root directory based on the `.env.example` file in the project root. In this file you will need to add your OpenAI API key and Supabase key and database URL.
+4. Create a `.env.local` file in the root directory based on the `.env.example` file in the project root. Ensure your `.env.local` file includes these variables:
+
+```env
+OPENAI_API_KEY=your_openai_api_key
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_PRIVATE_KEY=your_supabase_private_key
+```
    
-4. Run the development server:
+5. Run the development server:
 ```bash
 yarn run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+6. Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+
+## 📚 Document Ingestion
+
+The project includes an ingestion script (`ingest.mjs`) that processes markdown files and stores them in your Supabase vector database for AI retrieval.
+
+### Setup for Ingestion
+
+Ensure that your supabase database is running and that the `pgvector` extension is enabled as described in the [Local Development](#local-development) section.
+
+### Running the Ingestion Script
+
+To ingest documents, use the following command:
+```bash
+node ingest.mjs <path_to_markdown_directory>
+```
+
+For example:
+```bash
+node ingest.mjs ./docs
+```
+
+The script will:
+- Scan the specified directory for markdown (`.md`) files
+- Split the content into chunks with appropriate overlap
+- Generate embeddings using OpenAI
+- Store the embeddings in your Supabase vector database
