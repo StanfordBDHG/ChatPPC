@@ -25,7 +25,7 @@ yarn install
 
 3. Follow [these instructions](https://js.langchain.com/docs/integrations/vectorstores/supabase/) to set up a Supabase database as a vector store and connect it to this project.
 
-3. Create a `.env.local` file in the root directory based on the `.env.example` file in the project root.
+3. Create a `.env.local` file in the root directory based on the `.env.example` file in the project root. In this file you will need to add your OpenAI API key and Supabase key and database URL.
    
 4. Run the development server:
 ```bash
