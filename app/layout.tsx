@@ -37,23 +37,23 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <title>LangChain + Next.js Template</title>
+        <title>ChatPPC</title>
         <link rel="shortcut icon" href="/images/favicon.ico" />
         <meta
           name="description"
-          content="Starter template showing how to use LangChain in Next.js projects. See source code and deploy your own at https://github.com/langchain-ai/langchain-nextjs-template!"
+          content="This is a tool to help staff at Gardner Packard Children&apos;s Health Center navigate patient care resources."
         />
-        <meta property="og:title" content="LangChain + Next.js Template" />
+        <meta property="og:title" content="ChatPPC" />
         <meta
           property="og:description"
-          content="Starter template showing how to use LangChain in Next.js projects. See source code and deploy your own at https://github.com/langchain-ai/langchain-nextjs-template!"
+          content="This is a tool to help staff at Gardner Packard Children&apos;s Health Center navigate patient care resources."
         />
         <meta property="og:image" content="/images/og-image.png" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="LangChain + Next.js Template" />
+        <meta name="twitter:title" content="ChatPPC" />
         <meta
           name="twitter:description"
-          content="Starter template showing how to use LangChain in Next.js projects. See source code and deploy your own at https://github.com/langchain-ai/langchain-nextjs-template!"
+          content="This is a tool to help staff at Gardner Packard Children&apos;s Health Center navigate patient care resources."
         />
         <meta name="twitter:image" content="/images/og-image.png" />
       </head>
@@ -70,8 +70,7 @@ export default function RootLayout({
                 <Logo />
               </a> */}
               <nav className="flex gap-1 flex-col md:flex-row">
-                <ActiveLink href="/">ChatPPC</ActiveLink>
-                <ActiveLink href="/retrieval">General Chat</ActiveLink>
+                <span>ChatPPC</span>
               </nav>
             </div>
 
