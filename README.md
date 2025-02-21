@@ -43,13 +43,13 @@ yarn run dev
 6. Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 
-## 📚 Document Ingestion
+## Document Ingestion
 
 The project includes an ingestion script (`ingest.mjs`) that processes markdown files and stores them in your Supabase vector database for AI retrieval.
 
 ### Setup for Ingestion
 
-Ensure that your supabase database is running and that the `pgvector` extension is enabled as described in the [Local Development](#local-development) section.
+Ensure that your supabase database has been set up and that the `pgvector` extension is enabled as described in the [Local Development](#local-development) section.
 
 ### Running the Ingestion Script
 
