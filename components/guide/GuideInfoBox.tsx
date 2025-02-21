@@ -6,7 +6,6 @@ export function GuideInfoBox(props: { children: ReactNode }) {
       <div className="text-4xl text-center">
         🩺 <span className="font-semibold">+</span>💡
       </div>
-
       <div className="text-sm max-w-[600px] mx-auto text-center">
         {props.children}
       </div>
