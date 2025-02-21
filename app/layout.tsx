@@ -70,8 +70,8 @@ export default function RootLayout({
                 <Logo />
               </a> */}
               <nav className="flex gap-1 flex-col md:flex-row">
-                <ActiveLink href="/">General Chat</ActiveLink>
-                <ActiveLink href="/retrieval">ChatPPC</ActiveLink>
+                <ActiveLink href="/">ChatPPC</ActiveLink>
+                <ActiveLink href="/retrieval">General Chat</ActiveLink>
               </nav>
             </div>
 
