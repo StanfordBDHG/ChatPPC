@@ -23,7 +23,7 @@ export function ChatMessageBubble(props: {
         </div>
       )}
 
-      <div className="whitespace-pre-wrap flex flex-col">
+      <div className="flex flex-col">
         <div className="prose dark:prose-invert prose-a:text-blue-500 prose-a:underline max-w-none prose-p:text-foreground">
           <Markdown
             components={{
