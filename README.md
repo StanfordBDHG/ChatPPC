@@ -6,7 +6,7 @@ This is a tool to help staff at [Gardner Packard Children's Health Center](https
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 22+ 
 - OpenAI API key
 - [Supabase](https://supabase.com/) project
 
