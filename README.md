@@ -10,7 +10,7 @@ This is a tool to help staff at [Gardner Packard Children's Health Center](https
 - OpenAI API key
 - [Supabase](https://supabase.com/) project
 
-### Installation
+### Setup for Development
 
 1. Clone the repository:
 ```bash
@@ -34,7 +34,10 @@ OPENAI_API_KEY=your_openai_api_key
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_PRIVATE_KEY=your_supabase_private_key
 ```
-   
+
+> [!TIP]
+> If you are running the application for the first time, follow the instructions in the [Document Ingestion](#document-ingestion) section below to ingest documents into your Supabase vector database.
+
 5. Run the development server:
 ```bash
 yarn run dev
@@ -42,25 +45,28 @@ yarn run dev
 
 6. Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-
 ## Document Ingestion
 
 The project includes an ingestion script (`ingest.mjs`) that processes markdown files and stores them in your Supabase vector database for AI retrieval.
 
 ### Setup for Ingestion
 
-Ensure that your supabase database has been set up and that the `pgvector` extension is enabled as described in the [Local Development](#local-development) section.
+Ensure that you have followed the instructions in [Local Development](#local-development) section above to set up your project first.
+
+### Preparing Documents for Ingestion
+
+Documents should be stored in a directory (e.g. `docs`) within the project root. Each document should be a properly formatted markdown file.
 
 ### Running the Ingestion Script
 
 To ingest documents, use the following command:
 ```bash
-node ingest.mjs <path_to_markdown_directory>
+yarn ingest <path_to_markdown_directory>
 ```
 
 For example:
 ```bash
-node ingest.mjs ./docs
+yarn ingest docs              # documents to ingest are in the 'docs' directory
 ```
 
 The script will:
