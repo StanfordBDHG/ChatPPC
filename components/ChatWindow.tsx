@@ -162,12 +162,15 @@ export function ChatWindow(props: {
 
   // Initialize sessionId from localStorage or create a new one
   useEffect(() => {
+    console.log("Initializing session from localStorage or creating new one");
     const savedSessionId = localStorage.getItem("chatSessionId");
     if (savedSessionId) {
+      console.log("Found existing session ID:", savedSessionId);
       setSessionId(savedSessionId);
       loadChatHistory(savedSessionId);
     } else {
       const newSessionId = uuidv4();
+      console.log("Created new session ID:", newSessionId);
       setSessionId(newSessionId);
       localStorage.setItem("chatSessionId", newSessionId);
     }
@@ -178,6 +181,7 @@ export function ChatWindow(props: {
     if (!sid) return;
     
     try {
+      console.log("Loading chat history for session:", sid);
       setIsLoadingHistory(true);
       const response = await fetch(`/api/chat/history?sessionId=${sid}`);
       
@@ -186,15 +190,11 @@ export function ChatWindow(props: {
       }
       
       const data = await response.json();
+      console.log("History data received:", data);
       
       if (data.messages && data.messages.length > 0) {
-        console.log("Loading chat history:", data.messages);
+        console.log("Setting messages from history:", data.messages);
         chat.setMessages(data.messages);
-        
-        // Save the loaded messages after a small delay to ensure they're properly set
-        setTimeout(() => {
-          saveCurrentChatState();
-        }, 500);
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
@@ -205,10 +205,19 @@ export function ChatWindow(props: {
   };
 
   const saveChatMessages = async (messages: Message[]) => {
-    if (!sessionId || messages.length === 0) return;
+    if (!sessionId || messages.length === 0) {
+      console.log("Not saving messages - sessionId or messages empty", { sessionId, messageCount: messages.length });
+      return;
+    }
+    
+    console.log("Saving messages to database", { 
+      sessionId, 
+      messageCount: messages.length,
+      messageRoles: messages.map(m => m.role).join(', ')
+    });
     
     try {
-      await fetch("/api/chat/store", {
+      const response = await fetch("/api/chat/store", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -218,9 +227,15 @@ export function ChatWindow(props: {
           messages,
         }),
       });
+      
+      const data = await response.json();
+      console.log("Save response:", data);
+      
+      if (!response.ok) {
+        console.error("Error saving messages:", data.error);
+      }
     } catch (error) {
-      console.error("Error saving chat messages:", error);
-      // Don't show a toast here to avoid spamming the user
+      console.error("Exception saving chat messages:", error);
     }
   };
 
@@ -245,6 +260,7 @@ export function ChatWindow(props: {
       sessionId: sessionId
     },
     onResponse(response) {
+      console.log("Chat onResponse callback triggered");
       const sourcesHeader = response.headers.get("x-sources");
       const sources = sourcesHeader
         ? JSON.parse(Buffer.from(sourcesHeader, "base64").toString("utf8"))
@@ -259,143 +275,183 @@ export function ChatWindow(props: {
       }
     },
     onFinish(message) {
-      // Save messages to database after a response is completed
-      console.log("Chat finished, saving messages:", chat.messages);
-      // This ensures we save the complete conversation including the assistant's response
-      setTimeout(() => {
-        if (chat.messages.length > 0) {
-          saveChatMessages(chat.messages);
-        }
-      }, 500); // Small delay to ensure all messages are properly updated
+      // This is called when the AI response is complete
+      console.log("Chat onFinish callback triggered with message:", message);
+      console.log("Current messages in chat:", chat.messages);
+      
+      // Save the entire conversation including the AI's response
+      if (chat.messages.length > 0 && sessionId) {
+        console.log("Saving messages from onFinish callback");
+        saveChatMessages(chat.messages);
+      } else {
+        console.log("Not saving from onFinish - conditions not met", { 
+          hasMessages: chat.messages.length > 0, 
+          hasSessionId: !!sessionId 
+        });
+      }
     },
     streamMode: "text",
-    onError: (e) =>
+    onError: (e) => {
+      console.error("Chat error:", e);
       toast.error(`Error while processing your request`, {
         description: e.message,
-      }),
+      });
+    },
   });
 
   async function sendMessage(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (chat.isLoading || intermediateStepsLoading) return;
+    console.log("sendMessage called");
+    
+    if (chat.isLoading || intermediateStepsLoading) {
+      console.log("Not proceeding - chat is loading:", { 
+        chatIsLoading: chat.isLoading, 
+        intermediateStepsLoading 
+      });
+      return;
+    }
 
-    // Save the current user message immediately
+    if (!showIntermediateSteps) {
+      // For normal mode, let the chat handler manage messages
+      console.log("Using normal chat flow");
+      
+      // First, manually add the user message to ensure we have it
+      const userMessage: Message = {
+        id: chat.messages.length.toString(),
+        content: chat.input,
+        role: "user",
+      };
+      
+      // Remember the current message count
+      const prevMessageCount = chat.messages.length;
+      
+      // Submit the form which will trigger the API call
+      chat.handleSubmit(e);
+      
+      // Set up a timer to check if messages were updated
+      setTimeout(() => {
+        console.log(`Checking messages after submission (previous: ${prevMessageCount}, current: ${chat.messages.length})`);
+        if (chat.messages.length > prevMessageCount) {
+          console.log("Messages were updated, saving to database");
+          saveChatMessages(chat.messages);
+        }
+      }, 500); // Check after a short delay to allow the message to be processed
+      
+      return;
+    }
+
+    // Handle intermediate steps mode
+    console.log("Using intermediate steps mode");
+    setIntermediateStepsLoading(true);
+
+    // Create user message
     const userMessage: Message = {
       id: chat.messages.length.toString(),
       content: chat.input,
       role: "user",
     };
-    
-    const updatedMessages = [...chat.messages, userMessage];
-    
-    if (!showIntermediateSteps) {
-      // For normal mode, let the chat handler manage messages
-      chat.handleSubmit(e);
-      
-      // Save messages after adding the user message
-      saveChatMessages(updatedMessages);
-      return;
-    }
-
-    // The rest of your existing code for intermediate steps
-    setIntermediateStepsLoading(true);
 
     chat.setInput("");
     const messagesWithUserReply = chat.messages.concat(userMessage);
     chat.setMessages(messagesWithUserReply);
     
-    // Save messages after adding the user message
+    // Save the user message right away
+    console.log("Saving user message in intermediate steps mode");
     saveChatMessages(messagesWithUserReply);
 
-    const response = await fetch(props.endpoint, {
-      method: "POST",
-      body: JSON.stringify({
-        messages: messagesWithUserReply,
-        show_intermediate_steps: true,
-        sessionId: sessionId,
-      }),
-    });
-    const json = await response.json();
-    setIntermediateStepsLoading(false);
-
-    if (!response.ok) {
-      toast.error(`Error while processing your request`, {
-        description: json.error,
-      });
-      return;
-    }
-
-    const responseMessages: Message[] = json.messages;
-
-    // Represent intermediate steps as system messages for display purposes
-    // TODO: Add proper support for tool messages
-    const toolCallMessages = responseMessages.filter(
-      (responseMessage: Message) => {
-        return (
-          (responseMessage.role === "assistant" &&
-            !!responseMessage.tool_calls?.length) ||
-          responseMessage.role === "tool"
-        );
-      },
-    );
-
-    const intermediateStepMessages = [];
-    for (let i = 0; i < toolCallMessages.length; i += 2) {
-      const aiMessage = toolCallMessages[i];
-      const toolMessage = toolCallMessages[i + 1];
-      intermediateStepMessages.push({
-        id: (messagesWithUserReply.length + i / 2).toString(),
-        role: "system" as const,
-        content: JSON.stringify({
-          action: aiMessage.tool_calls?.[0],
-          observation: toolMessage.content,
+    try {
+      const response = await fetch(props.endpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          messages: messagesWithUserReply,
+          show_intermediate_steps: true,
+          sessionId: sessionId,
         }),
       });
-    }
-    const newMessages = messagesWithUserReply;
-    for (const message of intermediateStepMessages) {
-      newMessages.push(message);
-      chat.setMessages([...newMessages]);
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1000 + Math.random() * 1000),
+      
+      if (!response.ok) {
+        const json = await response.json();
+        console.error("Error in intermediate steps mode:", json);
+        toast.error(`Error while processing your request`, {
+          description: json.error,
+        });
+        setIntermediateStepsLoading(false);
+        return;
+      }
+      
+      const json = await response.json();
+      const responseMessages: Message[] = json.messages;
+      
+      // Represent intermediate steps as system messages for display purposes
+      const toolCallMessages = responseMessages.filter(
+        (responseMessage: Message) => {
+          return (
+            (responseMessage.role === "assistant" &&
+              !!responseMessage.tool_calls?.length) ||
+            responseMessage.role === "tool"
+          );
+        },
       );
-    }
 
-    const finalMessages = [
-      ...newMessages,
-      {
-        id: newMessages.length.toString(),
-        content: responseMessages[responseMessages.length - 1].content,
-        role: "assistant" as const,
-      },
-    ];
-    
-    chat.setMessages(finalMessages);
-    
-    // Save final messages including AI response
-    saveChatMessages(finalMessages);
+      const intermediateStepMessages = [];
+      for (let i = 0; i < toolCallMessages.length; i += 2) {
+        const aiMessage = toolCallMessages[i];
+        const toolMessage = toolCallMessages[i + 1];
+        intermediateStepMessages.push({
+          id: (messagesWithUserReply.length + i / 2).toString(),
+          role: "system" as const,
+          content: JSON.stringify({
+            action: aiMessage.tool_calls?.[0],
+            observation: toolMessage.content,
+          }),
+        });
+      }
+      const newMessages = messagesWithUserReply;
+      for (const message of intermediateStepMessages) {
+        newMessages.push(message);
+        chat.setMessages([...newMessages]);
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 + Math.random() * 1000),
+        );
+      }
+
+      const finalMessages = [
+        ...newMessages,
+        {
+          id: newMessages.length.toString(),
+          content: responseMessages[responseMessages.length - 1].content,
+          role: "assistant" as const,
+        },
+      ];
+      
+      chat.setMessages(finalMessages);
+      
+      // Save final messages including AI response
+      saveChatMessages(finalMessages);
+    } catch (error: any) {
+      console.error("Error in intermediate steps mode:", error);
+      toast.error(`Error while processing your request`, {
+        description: error.message,
+      });
+    } finally {
+      setIntermediateStepsLoading(false);
+    }
   }
 
-  // Add a new function to actively save messages after they are processed
-  const saveCurrentChatState = () => {
-    if (chat.messages.length > 0 && sessionId) {
-      console.log("Manually saving current chat state:", chat.messages);
-      saveChatMessages(chat.messages);
-    }
-  };
-
-  // Use an effect to save messages whenever they change
+  // Add an effect to watch for changes to chat.messages and save them
   useEffect(() => {
-    if (chat.messages.length > 0 && !chat.isLoading && !intermediateStepsLoading) {
-      // Only save when we have messages and are not in a loading state
+    if (chat.messages.length > 0 && !chat.isLoading && !isLoadingHistory) {
+      console.log("Messages changed, current count:", chat.messages.length);
+      
+      // Check if we have an assistant message (meaning we have a complete exchange)
       const hasAssistantMessage = chat.messages.some(m => m.role === "assistant");
       if (hasAssistantMessage) {
-        console.log("Messages changed with assistant response, saving state");
-        saveCurrentChatState();
+        console.log("Messages include an assistant response, saving to database");
+        saveChatMessages(chat.messages);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chat.messages, chat.isLoading, intermediateStepsLoading, sessionId]);
+  }, [chat.messages, chat.isLoading]);
 
   return (
     <StickToBottom>
