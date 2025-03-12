@@ -1,12 +1,34 @@
 import { cn } from "@/utils/cn";
 import type { Message } from "ai/react";
 import Markdown from 'react-markdown'
+import { useCallback } from "react";
 
 export function ChatMessageBubble(props: {
   message: Message;
   aiEmoji?: string;
   sources: any[];
 }) {
+  const handleLinkClick = useCallback(async (e: React.MouseEvent<HTMLAnchorElement>, href: string, text: string) => {
+    // Don't interfere with normal link behavior
+    // Just log the click in the background
+    try {
+      await fetch('/api/chat/link-clicks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: localStorage.getItem('sessionId'),
+          messageId: props.message.id,
+          linkUrl: href,
+          linkText: text
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to log link click:', error);
+    }
+  }, [props.message.id]);
+
   return (
     <div
       className={cn(
@@ -27,9 +49,17 @@ export function ChatMessageBubble(props: {
         <div className="prose dark:prose-invert prose-a:text-blue-500 prose-a:underline max-w-none prose-p:text-foreground">
           <Markdown
             components={{
-              a: ({ node, ...props }) => (
-                <a {...props} target="_blank" rel="noopener noreferrer" />
-              )
+              a: ({ node, ...props }) => {
+                const text = props.children?.[0] || '';
+                return (
+                  <a 
+                    {...props} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    onClick={(e) => handleLinkClick(e, props.href || '', text as string)}
+                  />
+                );
+              }
             }}
           >
             {props.message.content}
