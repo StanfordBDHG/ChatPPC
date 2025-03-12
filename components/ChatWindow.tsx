@@ -2,10 +2,11 @@
 
 import { type Message } from "ai";
 import { useChat } from "ai/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { toast } from "sonner";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { v4 as uuidv4 } from "uuid";
 
 import { ChatMessageBubble } from "@/components/ChatMessageBubble";
 import { IntermediateStep } from "./IntermediateStep";
@@ -22,6 +23,7 @@ import {
   DialogTrigger,
 } from "./ui/dialog";
 import { cn } from "@/utils/cn";
+import { ChatHistory } from "@/components/ChatHistory";
 
 function ChatMessages(props: {
   messages: Message[];
@@ -76,6 +78,16 @@ function ChatInput(props: {
   children?: ReactNode;
   className?: string;
 }) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (form) {
+        props.onSubmit(new Event('submit') as unknown as FormEvent<HTMLFormElement>);
+      }
+    }
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -90,6 +102,7 @@ function ChatInput(props: {
           value={props.value}
           placeholder={props.placeholder}
           onChange={props.onChange}
+          onKeyDown={handleKeyDown}
           className="border-none outline-none bg-transparent p-4"
         />
 
@@ -153,10 +166,114 @@ export function ChatWindow(props: {
   const [sourcesForMessages, setSourcesForMessages] = useState<
     Record<string, any>
   >({});
+  
+  // Add sessionId state
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Initialize sessionId from localStorage or create a new one
+  useEffect(() => {
+    console.log("Initializing session from localStorage or creating new one");
+    const savedSessionId = localStorage.getItem("chatSessionId");
+    if (savedSessionId) {
+      console.log("Found existing session ID:", savedSessionId);
+      setSessionId(savedSessionId);
+      loadChatHistory(savedSessionId);
+    } else {
+      const newSessionId = uuidv4();
+      console.log("Created new session ID:", newSessionId);
+      setSessionId(newSessionId);
+      localStorage.setItem("chatSessionId", newSessionId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadChatHistory = async (sid: string) => {
+    if (!sid) return;
+    
+    try {
+      console.log("Loading chat history for session:", sid);
+      setIsLoadingHistory(true);
+      const response = await fetch(`/api/chat/history?sessionId=${sid}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to load chat history");
+      }
+      
+      const data = await response.json();
+      console.log("History data received:", data);
+      
+      if (data.messages && data.messages.length > 0) {
+        console.log("Setting messages from history:", data.messages);
+        chat.setMessages(data.messages);
+      }
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+      toast.error("Failed to load chat history");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const saveChatMessages = async (messages: Message[]) => {
+    if (!sessionId || messages.length === 0) {
+      console.log("Not saving messages - sessionId or messages empty", { sessionId, messageCount: messages.length });
+      return;
+    }
+    
+    console.log("Saving messages to database", { 
+      sessionId, 
+      messageCount: messages.length,
+      messageRoles: messages.map(m => m.role).join(', ')
+    });
+    
+    try {
+      const response = await fetch("/api/chat/store", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId,
+          messages,
+        }),
+      });
+      
+      const data = await response.json();
+      console.log("Save response:", data);
+      
+      if (!response.ok) {
+        console.error("Error saving messages:", data.error);
+      }
+    } catch (error) {
+      console.error("Exception saving chat messages:", error);
+    }
+  };
+
+  const handleSelectSession = (selectedSessionId: string) => {
+    setSessionId(selectedSessionId);
+    localStorage.setItem("chatSessionId", selectedSessionId);
+    loadChatHistory(selectedSessionId);
+  };
+
+  const startNewChat = () => {
+    const newSessionId = uuidv4();
+    setSessionId(newSessionId);
+    localStorage.setItem("chatSessionId", newSessionId);
+    chat.setMessages([]);
+    setSourcesForMessages({});
+  };
 
   const chat = useChat({
     api: props.endpoint,
+    id: sessionId || undefined,
+    key: sessionId || undefined,
+    // Always include sessionId in every request
+    body: {
+      sessionId: sessionId
+    },
     onResponse(response) {
+      console.log("Chat onResponse callback triggered");
       const sourcesHeader = response.headers.get("x-sources");
       const sources = sourcesHeader
         ? JSON.parse(Buffer.from(sourcesHeader, "base64").toString("utf8"))
@@ -170,95 +287,201 @@ export function ChatWindow(props: {
         });
       }
     },
+    onFinish(message) {
+      // This is called when the AI response is complete
+      console.log("Chat onFinish callback triggered with message:", message);
+      console.log("Current messages in chat:", chat.messages);
+      
+      // Save the entire conversation including the AI's response
+      if (chat.messages.length > 1 && sessionId) {
+        // Check that we have at least one user and one assistant message
+        const hasUserMessage = chat.messages.some(m => m.role === "user");
+        const hasAssistantMessage = chat.messages.some(m => m.role === "assistant");
+        
+        if (hasUserMessage && hasAssistantMessage) {
+          console.log("Saving complete conversation from onFinish callback");
+          saveChatMessages(chat.messages);
+        } else {
+          console.log("Not saving from onFinish - missing user or assistant message");
+        }
+      } else {
+        console.log("Not saving from onFinish - conditions not met", { 
+          hasMessages: chat.messages.length > 1, 
+          hasSessionId: !!sessionId 
+        });
+      }
+    },
     streamMode: "text",
-    onError: (e) =>
+    onError: (e) => {
+      console.error("Chat error:", e);
       toast.error(`Error while processing your request`, {
         description: e.message,
-      }),
+      });
+    },
   });
 
   async function sendMessage(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (chat.isLoading || intermediateStepsLoading) return;
-
-    if (!showIntermediateSteps) {
-      chat.handleSubmit(e);
+    console.log("sendMessage called", { inputValue: chat.input, sessionId });
+    
+    // Don't proceed if there's no input 
+    if (!chat.input || chat.input.trim() === '') {
+      console.log("Input is empty, not sending");
+      return;
+    }
+    
+    if (chat.isLoading || intermediateStepsLoading) {
+      console.log("Not proceeding - chat is loading");
       return;
     }
 
-    // Some extra work to show intermediate steps properly
+    if (!showIntermediateSteps) {
+      // For normal mode, let the chat handler manage messages
+      console.log("Using normal chat flow with sessionId:", sessionId);
+      
+      try {
+        // Directly log what we're sending to the API
+        console.log("handleSubmit options:", { 
+          data: { sessionId }
+        });
+        
+        // Submit the form with the session ID explicitly added
+        const options = {
+          data: {
+            sessionId: sessionId
+          }
+        };
+        
+        await chat.handleSubmit(e, options);
+        console.log("Message submitted successfully, current messages count:", chat.messages.length);
+        
+        // Force a save after a short delay
+        setTimeout(() => {
+          console.log("Forced save after message submission, messages:", chat.messages.length);
+          if (chat.messages.length > 0) {
+            saveChatMessages(chat.messages);
+          }
+        }, 1500);
+      } catch (error) {
+        console.error("Error submitting message:", error);
+        toast.error("Failed to send message");
+      }
+      
+      return;
+    }
+
+    // Handle intermediate steps mode
+    console.log("Using intermediate steps mode");
     setIntermediateStepsLoading(true);
 
-    chat.setInput("");
-    const messagesWithUserReply = chat.messages.concat({
+    // Create user message
+    const userMessage: Message = {
       id: chat.messages.length.toString(),
       content: chat.input,
       role: "user",
-    });
+    };
+
+    chat.setInput("");
+    const messagesWithUserReply = chat.messages.concat(userMessage);
     chat.setMessages(messagesWithUserReply);
+    
+    // Save the user message right away
+    console.log("Saving user message in intermediate steps mode");
+    saveChatMessages(messagesWithUserReply);
 
-    const response = await fetch(props.endpoint, {
-      method: "POST",
-      body: JSON.stringify({
-        messages: messagesWithUserReply,
-        show_intermediate_steps: true,
-      }),
-    });
-    const json = await response.json();
-    setIntermediateStepsLoading(false);
-
-    if (!response.ok) {
-      toast.error(`Error while processing your request`, {
-        description: json.error,
-      });
-      return;
-    }
-
-    const responseMessages: Message[] = json.messages;
-
-    // Represent intermediate steps as system messages for display purposes
-    // TODO: Add proper support for tool messages
-    const toolCallMessages = responseMessages.filter(
-      (responseMessage: Message) => {
-        return (
-          (responseMessage.role === "assistant" &&
-            !!responseMessage.tool_calls?.length) ||
-          responseMessage.role === "tool"
-        );
-      },
-    );
-
-    const intermediateStepMessages = [];
-    for (let i = 0; i < toolCallMessages.length; i += 2) {
-      const aiMessage = toolCallMessages[i];
-      const toolMessage = toolCallMessages[i + 1];
-      intermediateStepMessages.push({
-        id: (messagesWithUserReply.length + i / 2).toString(),
-        role: "system" as const,
-        content: JSON.stringify({
-          action: aiMessage.tool_calls?.[0],
-          observation: toolMessage.content,
+    try {
+      const response = await fetch(props.endpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          messages: messagesWithUserReply,
+          show_intermediate_steps: true,
+          sessionId: sessionId,
         }),
       });
-    }
-    const newMessages = messagesWithUserReply;
-    for (const message of intermediateStepMessages) {
-      newMessages.push(message);
-      chat.setMessages([...newMessages]);
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1000 + Math.random() * 1000),
+      
+      if (!response.ok) {
+        const json = await response.json();
+        console.error("Error in intermediate steps mode:", json);
+        toast.error(`Error while processing your request`, {
+          description: json.error,
+        });
+        setIntermediateStepsLoading(false);
+        return;
+      }
+      
+      const json = await response.json();
+      const responseMessages: Message[] = json.messages;
+      
+      // Represent intermediate steps as system messages for display purposes
+      const toolCallMessages = responseMessages.filter(
+        (responseMessage: Message) => {
+          return (
+            (responseMessage.role === "assistant" &&
+              !!responseMessage.tool_calls?.length) ||
+            responseMessage.role === "tool"
+          );
+        },
       );
-    }
 
-    chat.setMessages([
-      ...newMessages,
-      {
-        id: newMessages.length.toString(),
-        content: responseMessages[responseMessages.length - 1].content,
-        role: "assistant",
-      },
-    ]);
+      const intermediateStepMessages = [];
+      for (let i = 0; i < toolCallMessages.length; i += 2) {
+        const aiMessage = toolCallMessages[i];
+        const toolMessage = toolCallMessages[i + 1];
+        intermediateStepMessages.push({
+          id: (messagesWithUserReply.length + i / 2).toString(),
+          role: "system" as const,
+          content: JSON.stringify({
+            action: aiMessage.tool_calls?.[0],
+            observation: toolMessage.content,
+          }),
+        });
+      }
+      const newMessages = messagesWithUserReply;
+      for (const message of intermediateStepMessages) {
+        newMessages.push(message);
+        chat.setMessages([...newMessages]);
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 + Math.random() * 1000),
+        );
+      }
+
+      const finalMessages = [
+        ...newMessages,
+        {
+          id: newMessages.length.toString(),
+          content: responseMessages[responseMessages.length - 1].content,
+          role: "assistant" as const,
+        },
+      ];
+      
+      chat.setMessages(finalMessages);
+      
+      // Save final messages including AI response
+      saveChatMessages(finalMessages);
+    } catch (error: any) {
+      console.error("Error in intermediate steps mode:", error);
+      toast.error(`Error while processing your request`, {
+        description: error.message,
+      });
+    } finally {
+      setIntermediateStepsLoading(false);
+    }
   }
+
+  // Add an effect to watch for changes to chat.messages and save them
+  useEffect(() => {
+    if (chat.messages.length > 0 && !chat.isLoading && !isLoadingHistory) {
+      console.log("Messages changed, current count:", chat.messages.length);
+      
+      // Check if we have an assistant message (meaning we have a complete exchange)
+      const hasAssistantMessage = chat.messages.some(m => m.role === "assistant");
+      if (hasAssistantMessage) {
+        console.log("Messages include an assistant response, saving to database");
+        saveChatMessages(chat.messages);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.messages, chat.isLoading]);
 
   return (
     <StickToBottom>
@@ -266,7 +489,14 @@ export function ChatWindow(props: {
         className="absolute inset-0"
         contentClassName="py-8 px-2"
         content={
-          chat.messages.length === 0 ? (
+          isLoadingHistory ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="text-center">
+                <LoaderCircle className="animate-spin h-8 w-8 mx-auto mb-2" />
+                <p>Loading chat history...</p>
+              </div>
+            </div>
+          ) : chat.messages.length === 0 ? (
             <div>{props.emptyStateComponent}</div>
           ) : (
             <ChatMessages
@@ -284,11 +514,22 @@ export function ChatWindow(props: {
               value={chat.input}
               onChange={chat.handleInputChange}
               onSubmit={sendMessage}
-              loading={chat.isLoading || intermediateStepsLoading}
+              loading={chat.isLoading || intermediateStepsLoading || isLoadingHistory}
               placeholder={
-                props.placeholder ?? "What's it like to be a pirate?"
+                props.placeholder ?? "Enter your question here!"
               }
             >
+              <ChatHistory onSelectSession={handleSelectSession} />
+              
+              <Button 
+                variant="ghost" 
+                className="pl-2 pr-3"
+                onClick={startNewChat}
+                disabled={chat.messages.length === 0}
+              >
+                <span>New Chat</span>
+              </Button>
+
               {props.showIngestForm && (
                 <Dialog>
                   <DialogTrigger asChild>
