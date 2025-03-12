@@ -10,20 +10,28 @@ export function ChatMessageBubble(props: {
 }) {
   const handleLinkClick = useCallback(async (e: React.MouseEvent<HTMLAnchorElement>, href: string, text: string) => {
     // Don't interfere with normal link behavior
-    // Just log the click in the background
+    // Just log the click in the background using sendBeacon which is more reliable for page transitions
     try {
-      await fetch('/api/chat/link-clicks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId: localStorage.getItem('sessionId'),
-          messageId: props.message.id,
-          linkUrl: href,
-          linkText: text
-        }),
-      });
+      const sessionId = localStorage.getItem('chatSessionId');
+      if (!sessionId) {
+        console.error('Session ID not found in localStorage (chatSessionId)');
+        return;
+      }
+      
+      console.log('Logging link click for session:', sessionId, 'URL:', href);
+      
+      const data = {
+        sessionId,
+        messageId: props.message.id,
+        linkUrl: href,
+        linkText: text
+      };
+      
+      // Use sendBeacon which is more reliable when pages are navigating away
+      navigator.sendBeacon(
+        '/api/chat/link-clicks',
+        new Blob([JSON.stringify(data)], { type: 'application/json' })
+      );
     } catch (error) {
       console.error('Failed to log link click:', error);
     }
@@ -50,13 +58,16 @@ export function ChatMessageBubble(props: {
           <Markdown
             components={{
               a: ({ node, ...props }) => {
-                const text = props.children?.[0] || '';
+                // Safely extract text content from children without unnecessary conversion
+                const text = Array.isArray(props.children)
+                  ? props.children[0]
+                  : props.children || '';
                 return (
                   <a 
                     {...props} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    onClick={(e) => handleLinkClick(e, props.href || '', text as string)}
+                    onClick={(e) => handleLinkClick(e, props.href || '', String(text))}
                   />
                 );
               }
