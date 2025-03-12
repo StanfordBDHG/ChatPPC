@@ -7,13 +7,9 @@ export const runtime = "edge";
 /**
  * This API endpoint handles storing chat messages in the database
  */
-export async function POST(req: NextRequest) {
-  console.log("Chat storage API called");
-  
+export async function POST(req: NextRequest) {  
   try {
-    const { sessionId, messages } = await req.json();
-    console.log(`Request received: ${messages.length} messages for session ${sessionId}`);
-    
+    const { sessionId, messages } = await req.json();    
     // Validate inputs
     if (!sessionId) {
       console.error("No session ID provided");
@@ -30,7 +26,6 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_PRIVATE_KEY!,
     );
     
-    console.log("Checking if session exists:", sessionId);
     // Check if session exists, create if not
     const { data: sessionData } = await client
       .from('chat_sessions')
@@ -39,10 +34,8 @@ export async function POST(req: NextRequest) {
       .single();
       
     if (!sessionData) {
-      console.log("Creating new session:", sessionId);
       await client.from('chat_sessions').insert({ id: sessionId });
     } else {
-      console.log("Updating existing session:", sessionId);
       // Update the session's updated_at timestamp
       await client
         .from('chat_sessions')
@@ -50,16 +43,11 @@ export async function POST(req: NextRequest) {
         .eq('id', sessionId);
     }
     
-    console.log("Deleting existing messages for session:", sessionId);
     // First, delete existing messages for this session to avoid duplicates
     await client
       .from('chat_messages')
       .delete()
       .eq('session_id', sessionId);
-    
-    // Log message details for debugging
-    const roles = messages.map(m => m.role);
-    console.log(`Message roles: ${roles.join(', ')}`);
     
     // Store messages
     const messagesToInsert = messages.map((msg: VercelChatMessage, index: number) => ({
@@ -70,7 +58,6 @@ export async function POST(req: NextRequest) {
       sequence_order: index
     }));
     
-    console.log(`Inserting ${messagesToInsert.length} messages`);
     const { error, data } = await client
       .from('chat_messages')
       .insert(messagesToInsert);
@@ -80,7 +67,6 @@ export async function POST(req: NextRequest) {
       throw error;
     }
     
-    console.log("Messages stored successfully");
     return NextResponse.json({ success: true, sessionId });
   } catch (e: any) {
     console.error("Error in chat storage API:", e);

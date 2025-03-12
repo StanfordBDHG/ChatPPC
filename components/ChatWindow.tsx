@@ -78,6 +78,16 @@ function ChatInput(props: {
   children?: ReactNode;
   className?: string;
 }) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (form) {
+        props.onSubmit(new Event('submit') as unknown as FormEvent<HTMLFormElement>);
+      }
+    }
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -92,6 +102,7 @@ function ChatInput(props: {
           value={props.value}
           placeholder={props.placeholder}
           onChange={props.onChange}
+          onKeyDown={handleKeyDown}
           className="border-none outline-none bg-transparent p-4"
         />
 
@@ -256,6 +267,8 @@ export function ChatWindow(props: {
   const chat = useChat({
     api: props.endpoint,
     id: sessionId || undefined,
+    key: sessionId || undefined,
+    // Always include sessionId in every request
     body: {
       sessionId: sessionId
     },
@@ -280,12 +293,20 @@ export function ChatWindow(props: {
       console.log("Current messages in chat:", chat.messages);
       
       // Save the entire conversation including the AI's response
-      if (chat.messages.length > 0 && sessionId) {
-        console.log("Saving messages from onFinish callback");
-        saveChatMessages(chat.messages);
+      if (chat.messages.length > 1 && sessionId) {
+        // Check that we have at least one user and one assistant message
+        const hasUserMessage = chat.messages.some(m => m.role === "user");
+        const hasAssistantMessage = chat.messages.some(m => m.role === "assistant");
+        
+        if (hasUserMessage && hasAssistantMessage) {
+          console.log("Saving complete conversation from onFinish callback");
+          saveChatMessages(chat.messages);
+        } else {
+          console.log("Not saving from onFinish - missing user or assistant message");
+        }
       } else {
         console.log("Not saving from onFinish - conditions not met", { 
-          hasMessages: chat.messages.length > 0, 
+          hasMessages: chat.messages.length > 1, 
           hasSessionId: !!sessionId 
         });
       }
@@ -301,41 +322,50 @@ export function ChatWindow(props: {
 
   async function sendMessage(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    console.log("sendMessage called");
+    console.log("sendMessage called", { inputValue: chat.input, sessionId });
+    
+    // Don't proceed if there's no input 
+    if (!chat.input || chat.input.trim() === '') {
+      console.log("Input is empty, not sending");
+      return;
+    }
     
     if (chat.isLoading || intermediateStepsLoading) {
-      console.log("Not proceeding - chat is loading:", { 
-        chatIsLoading: chat.isLoading, 
-        intermediateStepsLoading 
-      });
+      console.log("Not proceeding - chat is loading");
       return;
     }
 
     if (!showIntermediateSteps) {
       // For normal mode, let the chat handler manage messages
-      console.log("Using normal chat flow");
+      console.log("Using normal chat flow with sessionId:", sessionId);
       
-      // First, manually add the user message to ensure we have it
-      const userMessage: Message = {
-        id: chat.messages.length.toString(),
-        content: chat.input,
-        role: "user",
-      };
-      
-      // Remember the current message count
-      const prevMessageCount = chat.messages.length;
-      
-      // Submit the form which will trigger the API call
-      chat.handleSubmit(e);
-      
-      // Set up a timer to check if messages were updated
-      setTimeout(() => {
-        console.log(`Checking messages after submission (previous: ${prevMessageCount}, current: ${chat.messages.length})`);
-        if (chat.messages.length > prevMessageCount) {
-          console.log("Messages were updated, saving to database");
-          saveChatMessages(chat.messages);
-        }
-      }, 500); // Check after a short delay to allow the message to be processed
+      try {
+        // Directly log what we're sending to the API
+        console.log("handleSubmit options:", { 
+          data: { sessionId }
+        });
+        
+        // Submit the form with the session ID explicitly added
+        const options = {
+          data: {
+            sessionId: sessionId
+          }
+        };
+        
+        await chat.handleSubmit(e, options);
+        console.log("Message submitted successfully, current messages count:", chat.messages.length);
+        
+        // Force a save after a short delay
+        setTimeout(() => {
+          console.log("Forced save after message submission, messages:", chat.messages.length);
+          if (chat.messages.length > 0) {
+            saveChatMessages(chat.messages);
+          }
+        }, 1500);
+      } catch (error) {
+        console.error("Error submitting message:", error);
+        toast.error("Failed to send message");
+      }
       
       return;
     }
@@ -486,7 +516,7 @@ export function ChatWindow(props: {
               onSubmit={sendMessage}
               loading={chat.isLoading || intermediateStepsLoading || isLoadingHistory}
               placeholder={
-                props.placeholder ?? "What's it like to be a pirate?"
+                props.placeholder ?? "Enter your question here!"
               }
             >
               <ChatHistory onSelectSession={handleSelectSession} />
