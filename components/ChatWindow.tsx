@@ -196,6 +196,22 @@ export function ChatWindow(props: {
       setIsLoadingHistory(true);
       const response = await fetch(`/api/chat/history?sessionId=${sid}`);
       
+      if (response.status === 403) {
+        // User doesn't have permission to access this session
+        console.log("Access denied to session, creating new session");
+        toast.info("Starting a new chat session");
+        
+        // Create a new session
+        const newSessionId = uuidv4();
+        setSessionId(newSessionId);
+        localStorage.setItem("chatSessionId", newSessionId);
+        
+        // Clear any existing messages
+        chat.setMessages([]);
+        setSourcesForMessages({});
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error("Failed to load chat history");
       }
@@ -210,6 +226,16 @@ export function ChatWindow(props: {
     } catch (error) {
       console.error("Error loading chat history:", error);
       toast.error("Failed to load chat history");
+      
+      // If we can't load the history for any reason, start a new session
+      // This handles cases like deleted sessions or database errors
+      const newSessionId = uuidv4();
+      setSessionId(newSessionId);
+      localStorage.setItem("chatSessionId", newSessionId);
+      
+      // Clear any existing messages
+      chat.setMessages([]);
+      setSourcesForMessages({});
     } finally {
       setIsLoadingHistory(false);
     }
@@ -519,7 +545,10 @@ export function ChatWindow(props: {
                 props.placeholder ?? "Enter your question here!"
               }
             >
-              <ChatHistory onSelectSession={handleSelectSession} />
+              <ChatHistory 
+                onSelectSession={handleSelectSession}
+                onStartNewChat={startNewChat}
+              />
               
               <Button 
                 variant="ghost" 
