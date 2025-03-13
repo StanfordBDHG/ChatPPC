@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        input {
+            padding: 8px;
+            margin-right: 10px;
+            width: 300px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cookie Test</h1>
+    <p>This page tests if the user_id cookie is being properly set and persisted.</p>
+    
+    <div class="section">
+        <h2>Set Custom User ID:</h2>
+        <input type="text" id="userIdInput" placeholder="Enter a user ID" value="test-persistent-user-123">
+        <button id="setUserId">Set User ID Cookie</button>
+    </div>
+    
+    <div class="section">
+        <h2>Test Options:</h2>
+        <button id="checkCookie">Check Current Cookies</button>
+        <button id="testApi">Test Sessions API</button>
+        <button id="createSession">Create Test Session</button>
+        <button id="clearLocalStorage">Clear Session ID from localStorage</button>
+    </div>
+    
+    <div class="section">
+        <h2>Current Cookies:</h2>
+        <pre id="cookieOutput">No data yet.</pre>
+    </div>
+    
+    <div class="section">
+        <h2>API Response:</h2>
+        <pre id="apiOutput">No data yet.</pre>
+    </div>
+    
+    <div class="section">
+        <h2>localStorage:</h2>
+        <pre id="localStorageOutput">No data yet.</pre>
+    </div>
+    
+    <script>
+        // Function to update cookie display
+        function showCookies() {
+            document.getElementById('cookieOutput').textContent = document.cookie || "No cookies found";
+        }
+        
+        // Function to update localStorage display
+        function showLocalStorage() {
+            const sessionId = localStorage.getItem("chatSessionId");
+            document.getElementById('localStorageOutput').textContent = 
+                sessionId ? `chatSessionId: ${sessionId}` : "No chatSessionId in localStorage";
+        }
+        
+        // Function to test the API
+        async function testApi() {
+            try {
+                document.getElementById('apiOutput').textContent = "Loading...";
+                
+                // Add timestamp to prevent caching
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/chat/sessions?debug=true&_t=${timestamp}`);
+                const data = await response.json();
+                
+                document.getElementById('apiOutput').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('apiOutput').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Function to create a test session
+        async function createTestSession() {
+            try {
+                document.getElementById('apiOutput').textContent = "Creating test session...";
+                
+                const sessionId = crypto.randomUUID();
+                const response = await fetch('/api/chat/store', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sessionId: sessionId,
+                        messages: [
+                            { role: 'user', content: 'This is a test message' }
+                        ]
+                    })
+                });
+                
+                const data = await response.json();
+                document.getElementById('apiOutput').textContent = JSON.stringify(data, null, 2);
+                
+                // Also update localStorage with this session ID
+                localStorage.setItem("chatSessionId", sessionId);
+                showLocalStorage();
+            } catch (error) {
+                document.getElementById('apiOutput').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Function to set a custom user ID cookie
+        function setUserId() {
+            const userId = document.getElementById('userIdInput').value.trim();
+            if (!userId) {
+                alert('Please enter a user ID');
+                return;
+            }
+            
+            // Set the cookie with a long expiration (1 year)
+            const expiryDate = new Date();
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+            
+            document.cookie = `user_id=${userId}; expires=${expiryDate.toUTCString()}; path=/`;
+            alert(`User ID cookie set to: ${userId}`);
+            
+            showCookies();
+        }
+        
+        // Clear localStorage session ID
+        function clearLocalStorage() {
+            localStorage.removeItem("chatSessionId");
+            showLocalStorage();
+            alert("Session ID cleared from localStorage");
+        }
+        
+        // Add event listeners
+        document.getElementById('checkCookie').addEventListener('click', showCookies);
+        document.getElementById('testApi').addEventListener('click', testApi);
+        document.getElementById('clearLocalStorage').addEventListener('click', clearLocalStorage);
+        document.getElementById('setUserId').addEventListener('click', setUserId);
+        document.getElementById('createSession').addEventListener('click', createTestSession);
+        
+        // Initial display
+        showCookies();
+        showLocalStorage();
+    </script>
+</body>
+</html> 

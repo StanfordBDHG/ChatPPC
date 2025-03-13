@@ -10,8 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "./ui/dialog";
-import { History } from "lucide-react";
+import { History, PlusCircle } from "lucide-react";
 
 interface Session {
   id: string;
@@ -20,9 +21,11 @@ interface Session {
 }
 
 export function ChatHistory({ 
-  onSelectSession 
+  onSelectSession,
+  onStartNewChat 
 }: { 
-  onSelectSession: (id: string) => void 
+  onSelectSession: (id: string) => void;
+  onStartNewChat: () => void;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +56,11 @@ export function ChatHistory({
   
   const handleSelectSession = (sessionId: string) => {
     onSelectSession(sessionId);
+    setOpen(false);
+  };
+  
+  const handleStartNewChat = () => {
+    onStartNewChat();
     setOpen(false);
   };
   
@@ -101,6 +109,16 @@ export function ChatHistory({
             </ul>
           </div>
         )}
+        <DialogFooter>
+          <Button 
+            variant="default" 
+            onClick={handleStartNewChat}
+            className="w-full mt-2"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Start New Chat
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
