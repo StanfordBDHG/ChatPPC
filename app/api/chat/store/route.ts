@@ -26,28 +26,56 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_PRIVATE_KEY!,
     );
     
-    // Check if session exists, create if not
-    const { data: sessionData } = await client
+    // Check if session exists
+    const { data: sessionData, error: sessionError } = await client
       .from('chat_sessions')
       .select('id')
       .eq('id', sessionId)
       .single();
       
+    if (sessionError && sessionError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      console.error("Error checking session:", sessionError);
+      throw sessionError;
+    }
+
+    // Create session if it doesn't exist
     if (!sessionData) {
-      await client.from('chat_sessions').insert({ id: sessionId });
+      console.log("Creating new session:", sessionId);
+      const { error: createError } = await client
+        .from('chat_sessions')
+        .insert({ 
+          id: sessionId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (createError) {
+        console.error("Error creating session:", createError);
+        throw createError;
+      }
     } else {
       // Update the session's updated_at timestamp
-      await client
+      const { error: updateError } = await client
         .from('chat_sessions')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', sessionId);
+      
+      if (updateError) {
+        console.error("Error updating session timestamp:", updateError);
+        throw updateError;
+      }
     }
     
     // First, delete existing messages for this session to avoid duplicates
-    await client
+    const { error: deleteError } = await client
       .from('chat_messages')
       .delete()
       .eq('session_id', sessionId);
+    
+    if (deleteError) {
+      console.error("Error deleting existing messages:", deleteError);
+      throw deleteError;
+    }
     
     // Store messages
     const messagesToInsert = messages.map((msg: VercelChatMessage, index: number) => ({
@@ -58,13 +86,13 @@ export async function POST(req: NextRequest) {
       sequence_order: index
     }));
     
-    const { error, data } = await client
+    const { error: insertError } = await client
       .from('chat_messages')
       .insert(messagesToInsert);
     
-    if (error) {
-      console.error("Database error:", error);
-      throw error;
+    if (insertError) {
+      console.error("Error inserting messages:", insertError);
+      throw insertError;
     }
     
     return NextResponse.json({ success: true, sessionId });

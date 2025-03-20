@@ -32,21 +32,25 @@ export function ChatInput(props: {
         e.preventDefault();
         props.onSubmit(e);
       }}
-      className={cn("flex w-full flex-col", props.className)}
+      className={cn("w-full max-w-[768px] mx-auto", props.className)}
     >
-      <div className="border border-input bg-secondary rounded-lg flex flex-col gap-2 max-w-[768px] w-full mx-auto">
+      <div className="relative flex items-center">
         <input
           value={props.value}
           placeholder={props.placeholder}
           onChange={props.onChange}
           onKeyDown={handleKeyDown}
-          className="border-none outline-none bg-transparent p-4"
+          className="w-full rounded-lg border border-input bg-secondary px-4 py-3 pr-20"
         />
-
-        <div className="flex justify-between ml-4 mr-2 mb-2">
-          <div className="flex gap-3">{props.children}</div>
-
-          <Button type="submit" className="self-end" disabled={props.loading}>
+        
+        <div className="absolute right-2 flex items-center gap-2">
+          {props.children}
+          <Button 
+            type="submit" 
+            variant="default"
+            size="sm" 
+            disabled={props.loading}
+          >
             {props.loading ? (
               <span role="status" className="flex justify-center">
                 <LoaderCircle className="animate-spin" />

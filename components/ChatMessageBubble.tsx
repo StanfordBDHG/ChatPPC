@@ -7,21 +7,21 @@ export function ChatMessageBubble(props: {
   message: Message;
   aiEmoji?: string;
   sources: any[];
+  sessionId: string;
 }) {
   const handleLinkClick = useCallback(async (e: React.MouseEvent<HTMLAnchorElement>, href: string, text: string) => {
     // Don't interfere with normal link behavior
     // Just log the click in the background using sendBeacon which is more reliable for page transitions
     try {
-      const sessionId = localStorage.getItem('chatSessionId');
-      if (!sessionId) {
-        console.error('Session ID not found in localStorage (chatSessionId)');
+      if (!props.sessionId) {
+        console.error('No session ID provided');
         return;
       }
       
-      console.log('Logging link click for session:', sessionId, 'URL:', href);
+      console.log('Logging link click for session:', props.sessionId, 'URL:', href);
       
       const data = {
-        sessionId,
+        sessionId: props.sessionId,
         messageId: props.message.id,
         linkUrl: href,
         linkText: text
@@ -35,7 +35,7 @@ export function ChatMessageBubble(props: {
     } catch (error) {
       console.error('Failed to log link click:', error);
     }
-  }, [props.message.id]);
+  }, [props.message.id, props.sessionId]);
 
   return (
     <div
