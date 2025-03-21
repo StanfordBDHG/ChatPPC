@@ -26,6 +26,15 @@ export default function AgentsPage() {
         </li>
       </ul>
 
+      <ul>
+        <li className="hidden text-2xl md:block">
+          🔓
+            <span className="ml-2 text-xl">
+            Reminder: <strong>to access the linked Google Docs</strong>, you need to be signed in to your Stanford.edu account within Google.
+            </span>
+        </li>
+      </ul>
+
     </GuideInfoBox>
   );
   return (
@@ -34,7 +43,7 @@ export default function AgentsPage() {
       emptyStateComponent={InfoCard}
       showIngestForm={false}
       placeholder={
-        'Enter your question here! (Do NOT include PHI)'
+        'Enter your question here! (No PHI)'
       }
       emoji="💡"
     />
