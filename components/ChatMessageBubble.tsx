@@ -76,30 +76,6 @@ export function ChatMessageBubble(props: {
             {props.message.content}
           </Markdown>
         </div>
-
-        {props.sources && props.sources.length ? (
-          <>
-            <code className="mt-4 mr-auto bg-primary px-2 py-1 rounded">
-              <h2>🔍 Sources:</h2>
-            </code>
-            <code className="mt-1 mr-2 bg-primary px-2 py-1 rounded text-xs">
-              {props.sources?.map((source, i) => (
-                <div className="mt-2" key={"source:" + i}>
-                  {i + 1}. &quot;{source.pageContent}&quot;
-                  {source.metadata?.loc?.lines !== undefined ? (
-                    <div>
-                      <br />
-                      Lines {source.metadata?.loc?.lines?.from} to{" "}
-                      {source.metadata?.loc?.lines?.to}
-                    </div>
-                  ) : (
-                    ""
-                  )}
-                </div>
-              ))}
-            </code>
-          </>
-        ) : null}
       </div>
     </div>
   );
