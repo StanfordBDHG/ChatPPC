@@ -14,6 +14,7 @@ import { Button } from "./ui/button";
 import { ArrowDown, LoaderCircle, Paperclip } from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
 import { UploadDocumentsForm } from "./UploadDocumentsForm";
+import { ChatInput } from "./ChatInput";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,7 @@ import {
   DialogTrigger,
 } from "./ui/dialog";
 import { cn } from "@/utils/cn";
-import { ChatHistory } from "@/components/ChatHistory";
+// import { ChatHistory } from "@/components/ChatHistory";
 
 function ChatMessages(props: {
   messages: Message[];
@@ -31,6 +32,7 @@ function ChatMessages(props: {
   sourcesForMessages: Record<string, any>;
   aiEmoji?: string;
   className?: string;
+  sessionId: string;
 }) {
   return (
     <div className="flex flex-col max-w-[768px] mx-auto pb-12 w-full">
@@ -46,6 +48,7 @@ function ChatMessages(props: {
             message={m}
             aiEmoji={props.aiEmoji}
             sources={props.sourcesForMessages[sourceKey]}
+            sessionId={props.sessionId}
           />
         );
       })}
@@ -66,62 +69,6 @@ function ScrollToBottom(props: { className?: string }) {
       <ArrowDown className="w-4 h-4" />
       <span>Scroll to bottom</span>
     </Button>
-  );
-}
-
-function ChatInput(props: {
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  loading?: boolean;
-  placeholder?: string;
-  children?: ReactNode;
-  className?: string;
-}) {
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const form = e.currentTarget.form;
-      if (form) {
-        props.onSubmit(new Event('submit') as unknown as FormEvent<HTMLFormElement>);
-      }
-    }
-  };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        props.onSubmit(e);
-      }}
-      className={cn("flex w-full flex-col", props.className)}
-    >
-      <div className="border border-input bg-secondary rounded-lg flex flex-col gap-2 max-w-[768px] w-full mx-auto">
-        <input
-          value={props.value}
-          placeholder={props.placeholder}
-          onChange={props.onChange}
-          onKeyDown={handleKeyDown}
-          className="border-none outline-none bg-transparent p-4"
-        />
-
-        <div className="flex justify-between ml-4 mr-2 mb-2">
-          <div className="flex gap-3">{props.children}</div>
-
-          <Button type="submit" className="self-end" disabled={props.loading}>
-            {props.loading ? (
-              <span role="status" className="flex justify-center">
-                <LoaderCircle className="animate-spin" />
-                <span className="sr-only">Loading...</span>
-              </span>
-            ) : (
-              <span>Send</span>
-            )}
-          </Button>
-        </div>
-      </div>
-    </form>
   );
 }
 
@@ -169,51 +116,13 @@ export function ChatWindow(props: {
   
   // Add sessionId state
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // Initialize sessionId from localStorage or create a new one
+  // Initialize with a new session ID every time
   useEffect(() => {
-    console.log("Initializing session from localStorage or creating new one");
-    const savedSessionId = localStorage.getItem("chatSessionId");
-    if (savedSessionId) {
-      console.log("Found existing session ID:", savedSessionId);
-      setSessionId(savedSessionId);
-      loadChatHistory(savedSessionId);
-    } else {
-      const newSessionId = uuidv4();
-      console.log("Created new session ID:", newSessionId);
-      setSessionId(newSessionId);
-      localStorage.setItem("chatSessionId", newSessionId);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const newSessionId = uuidv4();
+    console.log("Created new session ID:", newSessionId);
+    setSessionId(newSessionId);
   }, []);
-
-  const loadChatHistory = async (sid: string) => {
-    if (!sid) return;
-    
-    try {
-      console.log("Loading chat history for session:", sid);
-      setIsLoadingHistory(true);
-      const response = await fetch(`/api/chat/history?sessionId=${sid}`);
-      
-      if (!response.ok) {
-        throw new Error("Failed to load chat history");
-      }
-      
-      const data = await response.json();
-      console.log("History data received:", data);
-      
-      if (data.messages && data.messages.length > 0) {
-        console.log("Setting messages from history:", data.messages);
-        chat.setMessages(data.messages);
-      }
-    } catch (error) {
-      console.error("Error loading chat history:", error);
-      toast.error("Failed to load chat history");
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  };
 
   const saveChatMessages = async (messages: Message[]) => {
     if (!sessionId || messages.length === 0) {
@@ -252,16 +161,13 @@ export function ChatWindow(props: {
 
   const handleSelectSession = (selectedSessionId: string) => {
     setSessionId(selectedSessionId);
-    localStorage.setItem("chatSessionId", selectedSessionId);
-    loadChatHistory(selectedSessionId);
   };
 
   const startNewChat = () => {
     const newSessionId = uuidv4();
     setSessionId(newSessionId);
-    localStorage.setItem("chatSessionId", newSessionId);
-    chat.setMessages([]);
-    setSourcesForMessages({});
+    chat.setMessages([]); // Clear existing messages
+    chat.setInput(""); // Clear input field
   };
 
   const chat = useChat({
@@ -287,11 +193,7 @@ export function ChatWindow(props: {
         });
       }
     },
-    onFinish(message) {
-      // This is called when the AI response is complete
-      console.log("Chat onFinish callback triggered with message:", message);
-      console.log("Current messages in chat:", chat.messages);
-      
+    onFinish(message) {      
       // Save the entire conversation including the AI's response
       if (chat.messages.length > 1 && sessionId) {
         // Check that we have at least one user and one assistant message
@@ -299,7 +201,6 @@ export function ChatWindow(props: {
         const hasAssistantMessage = chat.messages.some(m => m.role === "assistant");
         
         if (hasUserMessage && hasAssistantMessage) {
-          console.log("Saving complete conversation from onFinish callback");
           saveChatMessages(chat.messages);
         } else {
           console.log("Not saving from onFinish - missing user or assistant message");
@@ -470,7 +371,7 @@ export function ChatWindow(props: {
 
   // Add an effect to watch for changes to chat.messages and save them
   useEffect(() => {
-    if (chat.messages.length > 0 && !chat.isLoading && !isLoadingHistory) {
+    if (chat.messages.length > 0 && !chat.isLoading) {
       console.log("Messages changed, current count:", chat.messages.length);
       
       // Check if we have an assistant message (meaning we have a complete exchange)
@@ -489,14 +390,7 @@ export function ChatWindow(props: {
         className="absolute inset-0"
         contentClassName="py-8 px-2"
         content={
-          isLoadingHistory ? (
-            <div className="flex justify-center items-center h-full">
-              <div className="text-center">
-                <LoaderCircle className="animate-spin h-8 w-8 mx-auto mb-2" />
-                <p>Loading chat history...</p>
-              </div>
-            </div>
-          ) : chat.messages.length === 0 ? (
+          chat.messages.length === 0 ? (
             <div>{props.emptyStateComponent}</div>
           ) : (
             <ChatMessages
@@ -504,6 +398,7 @@ export function ChatWindow(props: {
               messages={chat.messages}
               emptyStateComponent={props.emptyStateComponent}
               sourcesForMessages={sourcesForMessages}
+              sessionId={sessionId || ''}
             />
           )
         }
@@ -514,12 +409,13 @@ export function ChatWindow(props: {
               value={chat.input}
               onChange={chat.handleInputChange}
               onSubmit={sendMessage}
-              loading={chat.isLoading || intermediateStepsLoading || isLoadingHistory}
+              onNewChat={startNewChat}
+              loading={chat.isLoading || intermediateStepsLoading}
               placeholder={
                 props.placeholder ?? "Enter your question here!"
               }
             >
-              <ChatHistory onSelectSession={handleSelectSession} />
+              {/* <ChatHistory onSelectSession={handleSelectSession} />
               
               <Button 
                 variant="ghost" 
@@ -528,7 +424,7 @@ export function ChatWindow(props: {
                 disabled={chat.messages.length === 0}
               >
                 <span>New Chat</span>
-              </Button>
+              </Button> */}
 
               {props.showIngestForm && (
                 <Dialog>

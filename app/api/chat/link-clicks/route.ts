@@ -22,9 +22,28 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_PRIVATE_KEY!,
     );
+
+    // Check if session exists first
+    const { data: sessionData, error: sessionError } = await client
+      .from('chat_sessions')
+      .select('id')
+      .eq('id', sessionId)
+      .single();
+
+    if (sessionError && sessionError.code === 'PGRST116') { // No rows returned
+      return NextResponse.json(
+        { error: "Cannot log link click - chat session does not exist yet. Please send a message first." },
+        { status: 404 }
+      );
+    }
+
+    if (sessionError) {
+      console.error("Error checking session:", sessionError);
+      throw sessionError;
+    }
     
     // Log the link click
-    const { error, data } = await client
+    const { error } = await client
       .from('link_clicks')
       .insert({
         session_id: sessionId,

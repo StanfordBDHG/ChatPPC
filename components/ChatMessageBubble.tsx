@@ -7,21 +7,21 @@ export function ChatMessageBubble(props: {
   message: Message;
   aiEmoji?: string;
   sources: any[];
+  sessionId: string;
 }) {
   const handleLinkClick = useCallback(async (e: React.MouseEvent<HTMLAnchorElement>, href: string, text: string) => {
     // Don't interfere with normal link behavior
     // Just log the click in the background using sendBeacon which is more reliable for page transitions
     try {
-      const sessionId = localStorage.getItem('chatSessionId');
-      if (!sessionId) {
-        console.error('Session ID not found in localStorage (chatSessionId)');
+      if (!props.sessionId) {
+        console.error('No session ID provided');
         return;
       }
       
-      console.log('Logging link click for session:', sessionId, 'URL:', href);
+      console.log('Logging link click for session:', props.sessionId, 'URL:', href);
       
       const data = {
-        sessionId,
+        sessionId: props.sessionId,
         messageId: props.message.id,
         linkUrl: href,
         linkText: text
@@ -35,7 +35,7 @@ export function ChatMessageBubble(props: {
     } catch (error) {
       console.error('Failed to log link click:', error);
     }
-  }, [props.message.id]);
+  }, [props.message.id, props.sessionId]);
 
   return (
     <div
@@ -76,30 +76,6 @@ export function ChatMessageBubble(props: {
             {props.message.content}
           </Markdown>
         </div>
-
-        {props.sources && props.sources.length ? (
-          <>
-            <code className="mt-4 mr-auto bg-primary px-2 py-1 rounded">
-              <h2>🔍 Sources:</h2>
-            </code>
-            <code className="mt-1 mr-2 bg-primary px-2 py-1 rounded text-xs">
-              {props.sources?.map((source, i) => (
-                <div className="mt-2" key={"source:" + i}>
-                  {i + 1}. &quot;{source.pageContent}&quot;
-                  {source.metadata?.loc?.lines !== undefined ? (
-                    <div>
-                      <br />
-                      Lines {source.metadata?.loc?.lines?.from} to{" "}
-                      {source.metadata?.loc?.lines?.to}
-                    </div>
-                  ) : (
-                    ""
-                  )}
-                </div>
-              ))}
-            </code>
-          </>
-        ) : null}
       </div>
     </div>
   );
