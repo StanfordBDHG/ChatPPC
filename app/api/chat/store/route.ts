@@ -66,33 +66,53 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // First, delete existing messages for this session to avoid duplicates
-    const { error: deleteError } = await client
+    // Fetch existing messages to compare
+    const { data: existingMessages, error: fetchError } = await client
       .from('chat_messages')
-      .delete()
+      .select('sequence_order')
       .eq('session_id', sessionId);
     
-    if (deleteError) {
-      console.error("Error deleting existing messages:", deleteError);
-      throw deleteError;
+    if (fetchError) {
+      console.error("Error fetching existing messages:", fetchError);
+      throw fetchError;
+    }
+
+    // Create a Set of existing sequence orders for quick lookup
+    const existingSequenceOrders = new Set(existingMessages?.map(m => m.sequence_order) || []);
+    
+    // Only insert messages that don't already exist
+    const messagesToInsert = messages
+      .map((msg: VercelChatMessage, index: number) => ({
+        session_id: sessionId,
+        role: msg.role,
+        content: msg.content,
+        tool_calls: msg.tool_calls || null,
+        sequence_order: index,
+        // Only set created_at for new messages
+        created_at: existingSequenceOrders.has(index) ? undefined : new Date().toISOString()
+      }))
+      .filter(msg => !existingSequenceOrders.has(msg.sequence_order));
+
+    if (messagesToInsert.length > 0) {
+      const { error: insertError } = await client
+        .from('chat_messages')
+        .insert(messagesToInsert);
+      
+      if (insertError) {
+        console.error("Error inserting messages:", insertError);
+        throw insertError;
+      }
     }
     
-    // Store messages
-    const messagesToInsert = messages.map((msg: VercelChatMessage, index: number) => ({
-      session_id: sessionId,
-      role: msg.role,
-      content: msg.content,
-      tool_calls: msg.tool_calls || null,
-      sequence_order: index
-    }));
+    // Update session's updated_at timestamp since we have new messages
+    const { error: updateError } = await client
+      .from('chat_sessions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', sessionId);
     
-    const { error: insertError } = await client
-      .from('chat_messages')
-      .insert(messagesToInsert);
-    
-    if (insertError) {
-      console.error("Error inserting messages:", insertError);
-      throw insertError;
+    if (updateError) {
+      console.error("Error updating session timestamp:", updateError);
+      throw updateError;
     }
     
     return NextResponse.json({ success: true, sessionId });
