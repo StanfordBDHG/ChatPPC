@@ -2,11 +2,12 @@
 
 import { cn } from "@/utils/cn";
 import { Button } from "./ui/button";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, RefreshCw } from "lucide-react";
 import { FormEvent, ReactNode } from "react";
 
 export function ChatInput(props: {
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  onNewChat?: () => void;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   loading?: boolean;
@@ -45,6 +46,18 @@ export function ChatInput(props: {
         
         <div className="absolute right-2 flex items-center gap-2">
           {props.children}
+          {props.onNewChat && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={props.onNewChat}
+              className="px-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span className="sr-only">New Chat</span>
+            </Button>
+          )}
           <Button 
             type="submit" 
             variant="default"

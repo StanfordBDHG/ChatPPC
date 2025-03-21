@@ -166,6 +166,8 @@ export function ChatWindow(props: {
   const startNewChat = () => {
     const newSessionId = uuidv4();
     setSessionId(newSessionId);
+    chat.setMessages([]); // Clear existing messages
+    chat.setInput(""); // Clear input field
   };
 
   const chat = useChat({
@@ -407,6 +409,7 @@ export function ChatWindow(props: {
               value={chat.input}
               onChange={chat.handleInputChange}
               onSubmit={sendMessage}
+              onNewChat={startNewChat}
               loading={chat.isLoading || intermediateStepsLoading}
               placeholder={
                 props.placeholder ?? "Enter your question here!"
