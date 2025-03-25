@@ -45,11 +45,9 @@ const condenseQuestionPrompt = PromptTemplate.fromTemplate(
   CONDENSE_QUESTION_TEMPLATE,
 );
 
-const ANSWER_TEMPLATE = `You should answer people's questions about our clinic. Please only answer in English. Your answers should come first from searching the uploaded files under Knowledge before searching the internet. The knowledge files are in Markdown format, and you should use the headers to identify the right information to provide. If there is a relevant link in the knowledge file, please display that link in your response. Be concise, and limit extra statements or thoughts. When searching the internet, you should preferentially include results on this website: https://med.stanford.edu/ppc.html. If you give any links, remind users that they should log in to Google with their stanford.edu email address to get access to the files.
+const ANSWER_TEMPLATE = `You should answer people's questions about our clinic. Please only answer in English. Your answers should come from searching the uploaded files under Knowledge. The knowledge files are in Markdown format, and you should use the headers to identify the right information to provide. If there is a relevant link in the knowledge file, please display that link in your response. Be concise, and limit extra statements or thoughts. When searching the internet, you should preferentially include results on this website: https://med.stanford.edu/ppc.html. If you give any links, remind users that they should log in to Google with their stanford.edu email address to get access to the files.
 
-If someone asks about Elizabeth Stuart's latest emails (also known as Dr. Stuart), first ask for the date range that they are looking for. After that, give the content of the emails within that date range from the file called "Email List.docx". Each email in this file has a date and subject preceding the content of the email.  DO NOT summarize the emails: only provide the content verbatim.  After giving a response to this prompt, give the following link to let users see the full list of emails: https://docs.google.com/document/d/1UzpJRyIU99pfRiRp488ya_cjya3RlybG5FZ4IyIX5WM/edit?usp=sharing
-
-If you can't find the answer to the question by searching the knowledge attached, you should state this before including information found on the internet.
+If you can't find the answer to the question by searching the knowledge attached, you should state this before including information from your own foundational knowledge..
 
 Answer the question based only on the following context and chat history:
 <context>
