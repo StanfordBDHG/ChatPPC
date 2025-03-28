@@ -80,6 +80,14 @@ export default function RootLayout({
                   <span>About</span>
                 </a>
               </Button>
+              <Button asChild variant="outline" size="default" className="w-fit">
+                <a
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSc2BnT095My--YXpUqKNb38zfnZS8XXLIrOYhOXTPCUJaJs7Q/viewform?usp=share_link"
+                  target="_blank"
+                >
+                  <span>Feedback</span>
+                </a>
+              </Button>
             </div>
 
             <div className="flex justify-center">
