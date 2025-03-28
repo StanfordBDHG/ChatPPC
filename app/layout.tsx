@@ -60,7 +60,7 @@ export default function RootLayout({
       <body className={publicSans.className}>
         <div className="bg-secondary grid grid-rows-[auto,1fr] h-[100dvh]">
           <div className="grid grid-cols-[1fr,auto] gap-2 p-4">
-            <div className="flex gap-4 flex-col md:flex-row md:items-center">
+            <div className="flex gap-4 flex-row md:flex-row items-center">
               {/* <a
                 href="https://js.langchain.com"
                 rel="noopener noreferrer"
@@ -69,9 +69,17 @@ export default function RootLayout({
               >
                 <Logo />
               </a> */}
-              <nav className="flex gap-1 flex-col md:flex-row">
-                <span>ChatPPC</span>
+              <nav className="flex gap-1 flex-row md:flex-row">
+                <span className="[color:rgb(128,37,34)]"><strong>ChatPPC</strong></span>
               </nav>
+              <Button asChild variant="outline" size="default" className="w-fit">
+                <a
+                  href="https://drive.google.com/file/d/1Zs6viMDKc26CnAgJGjC6YTJDM_9Sfa2d/view?usp=share_link"
+                  target="_blank"
+                >
+                  <span>About</span>
+                </a>
+              </Button>
             </div>
 
             <div className="flex justify-center">
