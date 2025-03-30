@@ -96,7 +96,7 @@ export default function RootLayout({
                   href="https://med.stanford.edu/ppc.html"
                   target="_blank"
                 >
-                  <span>Go to PPC Website</span>
+                  <span>PPC Website</span>
                 </a>
               </Button>
             </div>
