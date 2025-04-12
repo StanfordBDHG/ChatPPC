@@ -1,5 +1,8 @@
 # ChatPPC
 
+[![Build and Test](https://github.com/StanfordBDHG/ChatPPC/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/StanfordBDHG/ChatPPC/actions/workflows/build-and-test.yml) 
+![Vercel Deploy](https://deploy-badge.vercel.app/vercel/chatppc)
+
 ![ChatPPC Screenshot](public/images/ChatPPC-screenshot-light.png#gh-light-mode-only)
 ![ChatPPC Screenshot](public/images/ChatPPC-screenshot-dark.png#gh-dark-mode-only)
 
