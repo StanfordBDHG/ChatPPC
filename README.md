@@ -14,65 +14,79 @@ ChatPPC is a tool to help staff at [Gardner Packard Children's Health Center](ht
 
 - Node.js 22+ 
 - OpenAI API key
-- [Supabase](https://supabase.com/) project
 
 ### Setup for Development
 
-1. Clone the repository:
+1. Install the Supabase CLI:
 ```bash
-git clone <your-repo-url>
-cd <project-directory>
+yarn global add supabase
 ```
 
-2. Install dependencies:
+2. Clone the repository:
+```bash
+git clone https://github.com/StanfordBDHG/ChatPPC
+cd ChatPPC
+```
+
+3. Install dependencies:
 ```bash
 yarn install
 ```
 
-3. Set up your Supabase database by following [these instructions](https://js.langchain.com/docs/integrations/vectorstores/supabase) to:
-   - Enable the `pgvector` extension
-   - Create the necessary tables and functions
+4. Initialize Supabase in your project:
+```bash
+supabase init
+```
 
-4. Create a `.env.local` file in the root directory based on the `.env.example` file in the project root. Ensure your `.env.local` file includes these variables:
+5. Start the Supabase emulator:
+```bash
+supabase start
+```
 
+If this step succeeded, you should see a message that begins with
+
+```
+supabase local development setup is running.
+```
+
+Note the `API URL` and `service_role key` that are printed out below this message when the emulator starts, which you will use in the next step.
+
+6. Create a `.env.local` file in the root directory with these variables:
 ```env
 OPENAI_API_KEY=your_openai_api_key
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_PRIVATE_KEY=your_supabase_private_key
+SUPABASE_URL={API URL}
+SUPABASE_PRIVATE_KEY={service_role key}
+```
+
+7. Apply database migrations:
+```bash
+supabase migration up
 ```
 
 > [!TIP]
-> If you are running the application for the first time, follow the instructions in the [Document Ingestion](#document-ingestion) section below to ingest documents into your Supabase vector database.
+> At this step, you can follow the instructions below in the *Document Ingestion* section if you wish to add documents to test with.
 
-5. Run the development server:
+8. Run the development server:
 ```bash
 yarn run dev
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000) to view the application.
+9. Open [http://localhost:3000](http://localhost:3000) to view the ChatPPC application. You can also access the Supabase Studio at [http://localhost:54323](http://localhost:54323) to view and manage your local database.
+
 
 ## Document Ingestion
 
-The project includes an ingestion script (`ingest.mjs`) that processes markdown files and stores them in your Supabase vector database for AI retrieval.
-
-### Setup for Ingestion
-
-Ensure that you have followed the instructions in [Local Development](#local-development) section above to set up your project first.
+The project includes an ingestion script that processes markdown files and stores them in your Supabase vector database for AI retrieval.
 
 ### Preparing Documents for Ingestion
 
-Documents should be stored in a directory (e.g. `docs`) within the project root. Each document should be a properly formatted markdown file.
+Add your markdown files to the `docs` directory. Each document should be a properly formatted markdown file (`.md`).
 
 ### Running the Ingestion Script
 
-To ingest documents, use the following command:
+To ingest documents from the `docs` folder, use the following command:
 ```bash
-yarn ingest <path_to_markdown_directory>
-```
-
-For example:
-```bash
-yarn ingest docs              # documents to ingest are in the 'docs' directory
+yarn ingest docs
 ```
 
 The script will:
