@@ -7,6 +7,7 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from 'dotenv';
+import { createHash } from 'crypto';
 
 config({ path: join(process.cwd(), '.env.local') });
 
@@ -31,7 +32,8 @@ async function getMarkdownFiles(dirPath) {
     const files = await readdir(dirPath);
     return files
       .filter(file => file.endsWith('.md'))
-      .map(file => join(dirPath, file));
+      .map(file => join(dirPath, file))
+      .map(path => path.replace(/\\/g, '/')); // Normalize path separators
   } catch (error) {
     console.error(`Error reading directory ${dirPath}:`, error);
     process.exit(1);
@@ -48,17 +50,71 @@ async function readMarkdownFile(filePath) {
   }
 }
 
-// Process a single markdown file
-async function processFile(filePath, vectorStore, splitter) {
+// Get document hash from content
+function getDocumentHash(content) {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+// Check if document exists and get its hash
+async function getExistingDocumentHash(client, filePath) {
   try {
-    console.log(`Processing ${filePath}...`);
-    const content = await readMarkdownFile(filePath);
-    const splitDocuments = await splitter.createDocuments([content], [{ source: filePath }]);
+    const { data, error } = await client
+      .from('documents')
+      .select('metadata')
+      .eq('metadata->>source', filePath)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`Error checking for existing document: ${error.message}`);
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return data.metadata?.hash;
+  } catch (error) {
+    console.error(`Error in getExistingDocumentHash: ${error.message}`);
+    return null;
+  }
+}
+
+// Process a single markdown file
+async function processFile(filePath, vectorStore, splitter, client) {
+  try {
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const content = await readMarkdownFile(normalizedPath);
+    const currentHash = getDocumentHash(content);
+    
+    const existingHash = await getExistingDocumentHash(client, normalizedPath);
+    
+    if (existingHash === currentHash) {
+      console.log(`Skipping ${normalizedPath} - content unchanged`);
+      return;
+    }
+
+    if (existingHash) {
+      const { error } = await client
+        .from('documents')
+        .delete()
+        .eq('metadata->>source', normalizedPath);
+      
+      if (error) {
+        console.error(`Error deleting existing document: ${error.message}`);
+        throw error;
+      }
+    }
+
+    const splitDocuments = await splitter.createDocuments(
+      [content], 
+      [{ source: normalizedPath, hash: currentHash }]
+    );
     
     await vectorStore.addDocuments(splitDocuments);
-    console.log(`Successfully processed ${filePath}`);
+    console.log(`Processed ${normalizedPath}`);
   } catch (error) {
-    console.error(`Error processing ${filePath}:`, error);
+    console.error(`Error processing ${normalizedPath}:`, error);
     throw error;
   }
 }
@@ -112,7 +168,7 @@ async function main() {
     // Process each file
     for (const file of files) {
       try {
-        await processFile(file, vectorStore, splitter);
+        await processFile(file, vectorStore, splitter, client);
       } catch (error) {
         console.error(`Failed to process ${file}. Continuing with next file...`);
       }
