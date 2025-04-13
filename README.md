@@ -66,12 +66,12 @@ supabase migration up
 > [!TIP]
 > At this step, you can follow the instructions below in the *Document Ingestion* section if you wish to add documents to test with.
 
-9. Run the development server:
+8. Run the development server:
 ```bash
 yarn run dev
 ```
 
-10. Open [http://localhost:3000](http://localhost:3000) to view the ChatPPC application. You can also access the Supabase Studio at [http://localhost:54323](http://localhost:54323) to view and manage your local database.
+9. Open [http://localhost:3000](http://localhost:3000) to view the ChatPPC application. You can also access the Supabase Studio at [http://localhost:54323](http://localhost:54323) to view and manage your local database.
 
 
 ## Document Ingestion
