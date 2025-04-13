@@ -80,21 +80,11 @@ The project includes an ingestion script that processes markdown files and store
 
 ### Preparing Documents for Ingestion
 
-1. Create a `docs` directory in your project root:
-```bash
-mkdir docs
-```
-
-2. Add your markdown files to the `docs` directory. Each document should be a properly formatted markdown file (`.md`).
+Add your markdown files to the `docs` directory. Each document should be a properly formatted markdown file (`.md`).
 
 ### Running the Ingestion Script
 
-To ingest documents, use the following command:
-```bash
-yarn ingest <path_to_markdown_directory>
-```
-
-For example:
+To ingest documents from the `docs` folder, use the following command:
 ```bash
 yarn ingest docs
 ```
