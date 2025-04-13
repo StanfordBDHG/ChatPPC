@@ -22,12 +22,10 @@ jobs:
     - name: Install dependencies
       run: yarn install
 
-    - name: Install Supabase CLI
-      run: |
-        curl -fsSL https://github.com/supabase/cli/releases/download/v1.145.0/supabase_1.145.0_linux_amd64.tar.gz | tar xz
-        sudo mv supabase /usr/local/bin/
+    - name: Set up Supabase CLI
+      uses: supabase/setup-cli@v1
 
-    - name: Start Supabase emulator and capture service role key
+    - name: Start Supabase emulator
       id: supabase
       run: |
         # Start Supabase and capture the output
@@ -38,7 +36,7 @@ jobs:
         SERVICE_ROLE_KEY=$(echo "$OUTPUT" | grep -oP "service_role key: \K[^ ]+")
         echo "SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
       env:
-        SUPABASE_PROJECT_ID: test
+        SUPABASE_PROJECT_ID: default
         SUPABASE_DB_PASSWORD: test
 
     - name: Wait for Supabase to be ready
@@ -54,13 +52,17 @@ jobs:
         echo "Supabase failed to start within 60 seconds"
         exit 1
 
-    - name: Run migrations
+    - name: Initialize Supabase project and run migrations
       run: |
-        supabase db push
+        supabase init
+        supabase migration up
+      env:
+        SUPABASE_PROJECT_ID: default
+        SUPABASE_DB_PASSWORD: test
 
     - name: Run document ingestion
       run: |
-        yarn ingest
+        yarn ingest docs
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         SUPABASE_URL: http://localhost:54321
