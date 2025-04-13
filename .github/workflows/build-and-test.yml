@@ -21,7 +21,53 @@ jobs:
         
     - name: Install dependencies
       run: yarn install
-    
+
+    - name: Set up Supabase CLI
+      uses: supabase/setup-cli@v1
+
+    - name: Start Supabase emulator
+      id: supabase
+      run: |
+        # Start Supabase and capture the output
+        OUTPUT=$(supabase start 2>&1)
+        echo "$OUTPUT"
+        
+        # Extract the service role key from the output
+        SERVICE_ROLE_KEY=$(echo "$OUTPUT" | grep -oP "service_role key: \K[^ ]+")
+        echo "SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+      env:
+        SUPABASE_PROJECT_ID: default
+        SUPABASE_DB_PASSWORD: test
+
+    - name: Wait for Supabase to be ready
+      run: |
+        for i in {1..30}; do
+          if curl -s http://localhost:54321/rest/v1/ > /dev/null; then
+            echo "Supabase is ready!"
+            exit 0
+          fi
+          echo "Waiting for Supabase to be ready... (attempt $i/30)"
+          sleep 2
+        done
+        echo "Supabase failed to start within 60 seconds"
+        exit 1
+
+    - name: Initialize Supabase project and run migrations
+      run: |
+        supabase init
+        supabase migration up
+      env:
+        SUPABASE_PROJECT_ID: default
+        SUPABASE_DB_PASSWORD: test
+
+    - name: Run document ingestion
+      run: |
+        yarn ingest docs
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        SUPABASE_URL: http://localhost:54321
+        SUPABASE_PRIVATE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+
     - name: Run lint
       run: yarn lint
 
@@ -30,4 +76,11 @@ jobs:
 
     - name: Run tests
       run: yarn test
+      env:
+        SUPABASE_URL: http://localhost:54321
+        SUPABASE_PRIVATE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+
+    - name: Stop Supabase emulator
+      if: always()
+      run: supabase stop
 
