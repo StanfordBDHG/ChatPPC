@@ -22,13 +22,6 @@ jobs:
     - name: Install dependencies
       run: yarn install
 
-    - name: Install Docker
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y docker.io
-        sudo systemctl start docker
-        sudo systemctl enable docker
-
     - name: Install Supabase CLI
       run: |
         curl -fsSL https://github.com/supabase/cli/releases/download/v1.145.0/supabase_1.145.0_linux_amd64.tar.gz | tar xz
@@ -63,7 +56,7 @@ jobs:
 
     - name: Run migrations
       run: |
-        supabase db reset
+        supabase db push
 
     - name: Run document ingestion
       run: |
