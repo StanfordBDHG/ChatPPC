@@ -14,7 +14,6 @@ ChatPPC is a tool to help staff at [Gardner Packard Children's Health Center](ht
 
 - Node.js 22+ 
 - OpenAI API key
-- [Supabase](https://supabase.com/) project
 
 ### Setup for Development
 
@@ -25,8 +24,8 @@ yarn global add supabase
 
 2. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd <project-directory>
+git clone https://github.com/StanfordBDHG/ChatPPC
+cd ChatPPC
 ```
 
 3. Install dependencies:
@@ -44,7 +43,13 @@ supabase init
 supabase start
 ```
 
-Note the API URL and service_role key that are printed out when the emulator starts, which you will use in the next step.
+If this step succeeded, you should see a message that begins with
+
+```
+supabase local development setup is running.
+```
+
+Note the `API URL` and `service_role key` that are printed out below this message when the emulator starts, which you will use in the next step.
 
 6. Create a `.env.local` file in the root directory with these variables:
 ```env
@@ -58,21 +63,15 @@ SUPABASE_PRIVATE_KEY={service_role key}
 supabase migration up
 ```
 
-8. Run the development server:
+8. Follow the instructions below in the *Document Ingestion* section if you wish to add documents.
+
+9. Run the development server:
 ```bash
 yarn run dev
 ```
 
-9. Open [http://localhost:3000](http://localhost:3000) to view the application.
+9. Open [http://localhost:3000](http://localhost:3000) to view the application. You can access the Supabase Studio at [http://localhost:54323](http://localhost:54323) to view and manage your local database.
 
-### Supabase Emulator Details
-
-The Supabase emulator provides the following services:
-- API: http://localhost:54321
-- Database: localhost:54322
-- Studio: http://localhost:54323
-
-You can access the Supabase Studio at http://localhost:54323 to view and manage your local database.
 
 ## Document Ingestion
 
