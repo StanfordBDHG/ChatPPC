@@ -141,6 +141,7 @@ export function ChatWindow(props: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-api-key": process.env.NEXT_PUBLIC_API_KEY || '',
         },
         body: JSON.stringify({
           sessionId,
@@ -177,6 +178,9 @@ export function ChatWindow(props: {
     // Always include sessionId in every request
     body: {
       sessionId: sessionId
+    },
+    headers: {
+      'x-api-key': process.env.NEXT_PUBLIC_API_KEY || '',
     },
     onResponse(response) {
       console.log("Chat onResponse callback triggered");
@@ -293,6 +297,10 @@ export function ChatWindow(props: {
     try {
       const response = await fetch(props.endpoint, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.NEXT_PUBLIC_API_KEY || '',
+        },
         body: JSON.stringify({
           messages: messagesWithUserReply,
           show_intermediate_steps: true,
