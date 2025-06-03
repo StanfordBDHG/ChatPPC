@@ -6,91 +6,38 @@
 ![ChatPPC Screenshot](public/images/ChatPPC-screenshot-light.png#gh-light-mode-only)
 ![ChatPPC Screenshot](public/images/ChatPPC-screenshot-dark.png#gh-dark-mode-only)
 
-ChatPPC is a tool to help staff at [Gardner Packard Children's Health Center](https://med.stanford.edu/ppc.html) navigate patient care resources, built with [Next.js](https://nextjs.org/), [Vercel AI SDK](https://sdk.vercel.ai/), and [LangChain](https://js.langchain.com/). This project also uses [Supabase](https://supabase.com/) as a vector database for retrieval augmented generation (RAG).
+ChatPPC is a tool to help staff at [Gardner Packard Children's Health Center](https://med.stanford.edu/ppc.html) navigate patient care resources.
 
-## Local Development
+## Features
 
-### Prerequisites
+### 🔍 **Intelligent Document Search**
+- AI-powered chat interface for navigating Stanford PPC documentation
+- Retrieval-augmented generation (RAG) using OpenAI GPT-4o-mini
+- Semantic search through uploaded medical resource documents
+- Source attribution with automatic link generation to relevant documents
 
-- Node.js 22+ 
-- OpenAI API key
+### 💬 **Advanced Chat Capabilities**
+- Real-time streaming responses for immediate feedback
+- Persistent chat sessions with conversation history
+- Context-aware responses that maintain conversation continuity
+- Safety features with PHI (Protected Health Information) warnings
 
-### Setup for Development
+### 📚 **Document Management**
+- Batch document ingestion via command-line script
+- Automatic text processing and embedding generation
+- Vector database storage for fast semantic retrieval
 
-1. Install the Supabase CLI:
-```bash
-yarn global add supabase
-```
+### 🎨 **Modern User Interface**
+- Responsive design optimized for desktop and mobile
+- Dark/light theme support
+- Clean, accessible interface built with Tailwind CSS and Radix UI
 
-2. Clone the repository:
-```bash
-git clone https://github.com/StanfordBDHG/ChatPPC
-cd ChatPPC
-```
+## Quick Start
 
-3. Install dependencies:
-```bash
-yarn install
-```
+To set up the project for local development, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
-4. Initialize Supabase in your project:
-```bash
-supabase init
-```
+To add documents for AI retrieval, see [INGESTION.md](./INGESTION.md).
 
-5. Start the Supabase emulator:
-```bash
-supabase start
-```
+## Contributing
 
-If this step succeeded, you should see a message that begins with
-
-```
-supabase local development setup is running.
-```
-
-Note the `API URL` and `service_role key` that are printed out below this message when the emulator starts, which you will use in the next step.
-
-6. Create a `.env.local` file in the root directory with these variables:
-```env
-OPENAI_API_KEY=your_openai_api_key
-SUPABASE_URL={API URL}
-SUPABASE_PRIVATE_KEY={service_role key}
-```
-
-7. Apply database migrations:
-```bash
-supabase migration up
-```
-
-> [!TIP]
-> At this step, you can follow the instructions below in the *Document Ingestion* section if you wish to add documents to test with.
-
-8. Run the development server:
-```bash
-yarn run dev
-```
-
-9. Open [http://localhost:3000](http://localhost:3000) to view the ChatPPC application. You can also access the Supabase Studio at [http://localhost:54323](http://localhost:54323) to view and manage your local database.
-
-
-## Document Ingestion
-
-The project includes an ingestion script that processes markdown files and stores them in your Supabase vector database for AI retrieval.
-
-### Preparing Documents for Ingestion
-
-Add your markdown files to the `docs` directory. Each document should be a properly formatted markdown file (`.md`).
-
-### Running the Ingestion Script
-
-To ingest documents from the `docs` folder, use the following command:
-```bash
-yarn ingest docs
-```
-
-The script will:
-- Scan the specified directory for markdown (`.md`) files
-- Split the content into chunks with appropriate overlap
-- Generate embeddings using OpenAI
-- Store the embeddings in your Supabase vector database
+Contributions to this project are welcome.
