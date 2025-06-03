@@ -2,6 +2,7 @@
 
 [![Build and Test](https://github.com/StanfordBDHG/ChatPPC/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/StanfordBDHG/ChatPPC/actions/workflows/build-and-test.yml) 
 ![Vercel Deploy](https://deploy-badge.vercel.app/vercel/chatppc)
+[![DOI](https://zenodo.org/badge/930550250.svg)](https://doi.org/10.5281/zenodo.15291628)
 
 ![ChatPPC Screenshot](public/images/ChatPPC-screenshot-light.png#gh-light-mode-only)
 ![ChatPPC Screenshot](public/images/ChatPPC-screenshot-dark.png#gh-dark-mode-only)
