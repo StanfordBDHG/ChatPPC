@@ -38,6 +38,8 @@ To set up the project for local development, see [DEVELOPMENT.md](./DEVELOPMENT.
 
 To add documents for AI retrieval, see [INGESTION.md](./INGESTION.md).
 
+To deploy the project to production, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## Contributing
 
 Contributions to this project are welcome.
