@@ -61,6 +61,9 @@ jobs:
         SUPABASE_DB_PASSWORD: test
 
     - name: Run document ingestion
+      ## Skips this step if the PR was opened by dependabot
+      ## which cannot access repository secrets.
+      if: github.actor != 'dependabot[bot]'
       run: |
         yarn ingest docs
       env:
