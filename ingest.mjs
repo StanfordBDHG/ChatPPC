@@ -181,5 +181,10 @@ async function main() {
   }
 }
 
-// Run the script
-main().catch(console.error);
+// Export functions for testing
+export { getDocumentHash, getExistingDocumentHash, processFile, getMarkdownFiles, readMarkdownFile };
+
+// Run the script only if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(console.error);
+}
