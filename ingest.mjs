@@ -17,6 +17,11 @@ const requiredEnvVars = [
   'OPENAI_API_KEY'
 ];
 
+// Normalize path separators to forward slashes
+function normalizePath(path) {
+  return path.replace(/\\/g, '/');
+}
+
 // Verify all required environment variables are present
 function checkEnvironmentVariables() {
   const missing = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -32,8 +37,7 @@ async function getMarkdownFiles(dirPath) {
     const files = await readdir(dirPath);
     return files
       .filter(file => file.endsWith('.md'))
-      .map(file => join(dirPath, file))
-      .map(path => path.replace(/\\/g, '/')); // Normalize path separators
+      .map(file => normalizePath(join(dirPath, file)));
   } catch (error) {
     console.error(`Error reading directory ${dirPath}:`, error);
     process.exit(1);
@@ -92,7 +96,7 @@ async function getExistingDocumentHash(client, filePath) {
 // Process a single markdown file
 async function processFile(filePath, vectorStore, splitter, client) {
   try {
-    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPath = normalizePath(filePath);
     console.log(`\n--- Processing file: ${normalizedPath} ---`);
     
     const content = await readMarkdownFile(normalizedPath);

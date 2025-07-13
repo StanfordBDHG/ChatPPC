@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"app\"",
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "npm run test:ingest",
+    "test:ingest": "node ingest.test.mjs",
+    "test:app": "echo \"App tests not yet configured\" && exit 0",
     "ingest": "node ingest.mjs"
   },
   "engines": {
