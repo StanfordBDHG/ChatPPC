@@ -7,6 +7,7 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from 'dotenv';
+import { createHash } from 'crypto';
 
 config({ path: join(process.cwd(), '.env.local') });
 
@@ -15,6 +16,11 @@ const requiredEnvVars = [
   'SUPABASE_PRIVATE_KEY',
   'OPENAI_API_KEY'
 ];
+
+// Normalize path separators to forward slashes
+function normalizePath(path) {
+  return path.replace(/\\/g, '/');
+}
 
 // Verify all required environment variables are present
 function checkEnvironmentVariables() {
@@ -31,7 +37,7 @@ async function getMarkdownFiles(dirPath) {
     const files = await readdir(dirPath);
     return files
       .filter(file => file.endsWith('.md'))
-      .map(file => join(dirPath, file));
+      .map(file => normalizePath(join(dirPath, file)));
   } catch (error) {
     console.error(`Error reading directory ${dirPath}:`, error);
     process.exit(1);
@@ -48,17 +54,94 @@ async function readMarkdownFile(filePath) {
   }
 }
 
-// Process a single markdown file
-async function processFile(filePath, vectorStore, splitter) {
+// Get document hash from content
+function getDocumentHash(content) {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+// Check if document exists and get its hash
+async function getExistingDocumentHash(client, filePath) {
   try {
-    console.log(`Processing ${filePath}...`);
-    const content = await readMarkdownFile(filePath);
-    const splitDocuments = await splitter.createDocuments([content], [{ source: filePath }]);
+    console.log(`Checking for existing document: ${filePath}`);
+    const { data, error } = await client
+      .from('documents')
+      .select('metadata')
+      .eq('metadata->>source', filePath)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`Error checking for existing document: ${error.message}`);
+      return null;
+    }
+
+    if (!data) {
+      console.log(`No existing document found for: ${filePath}`);
+      return null;
+    }
+
+    const existingHash = data.metadata?.hash;
+    if (existingHash) {
+      console.log(`Found existing document with hash: ${existingHash.substring(0, 12)}...`);
+    } else {
+      console.log(`Existing document found but no hash stored for: ${filePath}`);
+    }
     
-    await vectorStore.addDocuments(splitDocuments);
-    console.log(`Successfully processed ${filePath}`);
+    return existingHash;
   } catch (error) {
-    console.error(`Error processing ${filePath}:`, error);
+    console.error(`Error in getExistingDocumentHash: ${error.message}`);
+    return null;
+  }
+}
+
+// Process a single markdown file
+async function processFile(filePath, vectorStore, splitter, client) {
+  try {
+    const normalizedPath = normalizePath(filePath);
+    console.log(`\n--- Processing file: ${normalizedPath} ---`);
+    
+    const content = await readMarkdownFile(normalizedPath);
+    const currentHash = getDocumentHash(content);
+    console.log(`Generated hash for current content: ${currentHash.substring(0, 12)}...`);
+    
+    const existingHash = await getExistingDocumentHash(client, normalizedPath);
+    
+    if (existingHash === currentHash) {
+      console.log(`✓ Hash match - skipping ${normalizedPath} (content unchanged)`);
+      return;
+    }
+
+    if (existingHash && existingHash !== currentHash) {
+      console.log(`✗ Hash mismatch - content has changed`);
+      console.log(`  Old hash: ${existingHash.substring(0, 12)}...`);
+      console.log(`  New hash: ${currentHash.substring(0, 12)}...`);
+      console.log(`Deleting existing document entries...`);
+      
+      const { error } = await client
+        .from('documents')
+        .delete()
+        .eq('metadata->>source', normalizedPath);
+      
+      if (error) {
+        console.error(`Error deleting existing document: ${error.message}`);
+        throw error;
+      }
+      console.log(`✓ Deleted existing document entries`);
+    } else if (!existingHash) {
+      console.log(`✓ New document - no existing hash found`);
+    }
+
+    console.log(`Splitting document into chunks...`);
+    const splitDocuments = await splitter.createDocuments(
+      [content], 
+      [{ source: normalizedPath, hash: currentHash }]
+    );
+    console.log(`Created ${splitDocuments.length} document chunks`);
+    
+    console.log(`Storing document chunks with hash in database...`);
+    await vectorStore.addDocuments(splitDocuments);
+    console.log(`✓ Successfully processed and stored ${normalizedPath} with hash ${currentHash.substring(0, 12)}...`);
+  } catch (error) {
+    console.error(`Error processing ${normalizedPath}:`, error);
     throw error;
   }
 }
@@ -112,7 +195,7 @@ async function main() {
     // Process each file
     for (const file of files) {
       try {
-        await processFile(file, vectorStore, splitter);
+        await processFile(file, vectorStore, splitter, client);
       } catch (error) {
         console.error(`Failed to process ${file}. Continuing with next file...`);
       }
@@ -125,5 +208,10 @@ async function main() {
   }
 }
 
-// Run the script
-main().catch(console.error);
+// Export functions for testing
+export { getDocumentHash, getExistingDocumentHash, processFile, getMarkdownFiles, readMarkdownFile };
+
+// Run the script only if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(console.error);
+}
