@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { X, User, Bot } from 'lucide-react'
+import { fetchWithAuth, formatDate } from '@/lib/adminUtils'
 
 interface ChatMessage {
   id: string
@@ -36,24 +36,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchWithAuth = async (url: string) => {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) throw new Error('Not authenticated')
-
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`${response.status} - ${errorText}`)
-    }
-    
-    return response.json()
-  }
-
   const fetchConversationDetail = useCallback(async () => {
     try {
       const data = await fetchWithAuth(`/api/admin/conversations/${conversationId}`)
@@ -69,20 +51,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     fetchConversationDetail()
   }, [fetchConversationDetail])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Conversation Details</h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -97,8 +70,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Conversation Details</h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -115,8 +88,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-semibold">Session {conversationDetail?.session.id.slice(0, 8)}</h2>
@@ -130,12 +103,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         </div>
 
         <div className="mb-4 p-4 bg-muted rounded-lg">
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <strong>Total Messages:</strong> {conversationDetail?.messageCount || 0}
-            </div>
-            <div>
-              <strong>Created:</strong> {conversationDetail && formatDate(conversationDetail.session.created_at)}
             </div>
             <div>
               <strong>Last Updated:</strong> {conversationDetail && formatDate(conversationDetail.session.updated_at)}

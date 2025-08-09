@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { ChatAnalytics } from '@/components/admin/ChatAnalytics'
+import { Conversations } from '@/components/admin/Conversations'
 import { DocumentManagement } from '@/components/admin/DocumentManagement'
 import { BarChart3, FileText, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -85,7 +85,7 @@ export default function AdminDashboard() {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Chat Analytics
+            Conversations
           </TabsTrigger>
           <TabsTrigger value="documents" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
         </TabsList>
         
         <TabsContent value="analytics">
-          <ChatAnalytics stats={stats} />
+          <Conversations stats={stats} />
         </TabsContent>
         
         <TabsContent value="documents">

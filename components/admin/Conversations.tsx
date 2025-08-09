@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConversationDetail } from './ConversationDetail'
-import { createClient } from '@/lib/supabase'
 import { ChevronLeft, ChevronRight, Search, X, ExternalLink } from 'lucide-react'
+import { fetchWithAuth, formatDate } from '@/lib/adminUtils'
 
 interface Stats {
   totalConversations: number
@@ -51,11 +51,11 @@ interface LinkClickStats {
   uniqueLinks: number
 }
 
-interface ChatAnalyticsProps {
+interface ConversationsProps {
   stats: Stats | null
 }
 
-export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
+export function Conversations({ stats }: ConversationsProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [pagination, setPagination] = useState({
@@ -79,24 +79,6 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
   const [currentLinkSearch, setCurrentLinkSearch] = useState('')
 
   const PAGE_SIZE_OPTIONS = [5, 10, 20, 50]
-
-  const fetchWithAuth = async (url: string) => {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) throw new Error('Not authenticated')
-
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`${response.status} - ${errorText}`)
-    }
-    
-    return response.json()
-  }
 
   const [currentSearch, setCurrentSearch] = useState('')
 
@@ -123,9 +105,7 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
       const searchParam = search.trim() ? `&search=${encodeURIComponent(search)}` : ''
       const data = await fetchWithAuth(`/api/admin/link-clicks?page=${linkClicksPagination.page}&limit=${linkClicksPagination.limit}${searchParam}`)
       setLinkClickStats(data)
-      if (data.pagination) {
-        setLinkClicksPagination(data.pagination)
-      }
+      setLinkClicksPagination(data.pagination)
     } catch (err: any) {
       console.error('Error fetching link click stats:', err)
     } finally {
@@ -178,15 +158,6 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
     fetchConversations(searchQuery)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
 
   const statCards: StatCard[] = [
     { title: 'Total Conversations', value: stats?.totalConversations, description: 'All time' },
@@ -322,12 +293,9 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedConversationId(conversation.id)
-                    }}>
-                      View →
-                    </Button>
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      Click to view
+                    </span>
                   </div>
                 </div>
               ))}
