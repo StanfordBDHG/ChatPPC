@@ -32,10 +32,6 @@ export default function ConversationDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchConversation()
-  }, [fetchConversation])
-
   const fetchConversation = useCallback(async () => {
     try {
       const supabase = createClient()
@@ -67,6 +63,10 @@ export default function ConversationDetail() {
       setLoading(false)
     }
   }, [params.id])
+
+  useEffect(() => {
+    fetchConversation()
+  }, [fetchConversation])
 
   if (loading) {
     return (
