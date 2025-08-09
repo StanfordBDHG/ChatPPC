@@ -3,9 +3,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import { ChatAnalytics } from '@/components/admin/ChatAnalytics'
 import { DocumentManagement } from '@/components/admin/DocumentManagement'
-import { BarChart3, FileText } from 'lucide-react'
+import { BarChart3, FileText, MessageCircle } from 'lucide-react'
+import Link from 'next/link'
 
 interface Stats {
   totalConversations: number
@@ -71,6 +73,12 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         {renderHeader()}
+        <Button asChild variant="outline" size="default">
+          <Link href="/" className="flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" />
+            Back to Chat
+          </Link>
+        </Button>
       </div>
       
       <Tabs defaultValue="analytics" className="w-full">

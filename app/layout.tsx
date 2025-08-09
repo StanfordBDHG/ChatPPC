@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { GithubIcon } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { NavbarAuth } from "@/components/NavbarAuth";
+import Link from "next/link";
 
 const publicSans = Public_Sans({ subsets: ["latin"] });
 
@@ -71,7 +72,7 @@ export default function RootLayout({
                 <Logo />
               </a> */}
               <nav className="flex gap-1 flex-row md:flex-row">
-                <span className="[color:rgb(128,37,34)]"><strong>ChatPPC</strong></span>
+                <Link href="/" className="[color:rgb(128,37,34)]"><strong>ChatPPC</strong></Link>
               </nav>
               <Button asChild variant="outline" size="default" className="w-fit">
                 <a
