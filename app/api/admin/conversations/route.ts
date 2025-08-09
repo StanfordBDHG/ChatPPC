@@ -5,10 +5,15 @@ import { withAdminAuth } from "@/lib/adminAuth";
 
 async function handleGetConversations(req: NextRequest, _user: any) {
   const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10')));
     const search = searchParams.get('search') || '';
     const offset = (page - 1) * limit;
+    
+    // Validate search input
+    if (search.length > 1000) {
+      return NextResponse.json({ error: 'Search query too long' }, { status: 400 });
+    }
     
     const client = createClient(
       process.env.SUPABASE_URL!,
@@ -19,10 +24,18 @@ async function handleGetConversations(req: NextRequest, _user: any) {
     
     if (search.trim()) {
       // Search for conversations containing the search text in messages
+      // Using Supabase's safe parameterized query approach
+      const searchTerm = search.trim();
+      
+      // Escape special SQL LIKE characters to prevent injection
+      const escapedSearch = searchTerm
+        .replace(/\\/g, '\\\\')  // Escape backslashes first
+        .replace(/[%_]/g, '\\$&'); // Escape % and _ wildcard characters
+      
       const { data: matchingMessages } = await client
         .from('chat_messages')
         .select('session_id')
-        .ilike('content', `%${search.trim()}%`);
+        .ilike('content', `%${escapedSearch}%`);
       
       conversationIds = Array.from(new Set(matchingMessages?.map(m => m.session_id) || []));
       

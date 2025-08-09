@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { fetchWithAuth } from '@/lib/adminUtils'
 
 interface DocumentChunk {
   id: string
@@ -21,45 +21,27 @@ interface DocumentDetail {
 }
 
 interface DocumentDetailProps {
-  id: number
   source: string
   title: string
   onClose: () => void
 }
 
-export function DocumentDetail({ id, source, title, onClose }: DocumentDetailProps) {
+export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) {
   const [documentDetail, setDocumentDetail] = useState<DocumentDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchWithAuth = async (url: string) => {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) throw new Error('Not authenticated')
-
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`${response.status} - ${errorText}`)
-    }
-    
-    return response.json()
-  }
-
   const fetchDocumentDetail = useCallback(async () => {
     try {
-      const data = await fetchWithAuth(`/api/admin/documents/${id}`)
+      // Use source endpoint to get all chunks for this document
+      const data = await fetchWithAuth(`/api/admin/documents/${encodeURIComponent(source)}`)
       setDocumentDetail(data)
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [source])
 
   useEffect(() => {
     fetchDocumentDetail()
@@ -129,7 +111,11 @@ export function DocumentDetail({ id, source, title, onClose }: DocumentDetailPro
               <div className="flex flex-wrap gap-2">
                 {Object.entries(documentDetail.chunks[0].metadata).map(([key, value]) => (
                   <span key={key} className="text-xs bg-white border px-2 py-1 rounded">
-                    <strong>{key}:</strong> {String(value)}
+                    <strong>{key}:</strong> {
+                      typeof value === 'object' && value !== null 
+                        ? JSON.stringify(value)
+                        : String(value)
+                    }
                   </span>
                 ))}
               </div>

@@ -1,25 +1,21 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { DocumentDetail } from './DocumentDetail'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { fetchWithAuth } from '@/lib/adminUtils'
 
 interface Document {
   id: number
   source: string
   title: string
   content: string
-  metadata?: Record<string, any>
-  chunkCount: number
 }
 
 interface DocumentStats {
-  totalDocuments: number
-  totalChunks: number
   documents: Document[]
-  pagination?: {
+  pagination: {
     page: number
     limit: number
     total: number
@@ -41,32 +37,12 @@ export function DocumentManagement() {
 
   const PAGE_SIZE_OPTIONS = [5, 10, 20, 50]
 
-  const fetchWithAuth = async (url: string) => {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) throw new Error('Not authenticated')
-
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`${response.status} - ${errorText}`)
-    }
-    
-    return response.json()
-  }
-
   const fetchDocuments = useCallback(async () => {
     setLoading(true)
     try {
       const data = await fetchWithAuth(`/api/admin/documents?page=${pagination.page}&limit=${pagination.limit}`)
       setDocumentStats(data)
-      if (data.pagination) {
-        setPagination(data.pagination)
-      }
+      setPagination(data.pagination)
       setError(null)
     } catch (err: any) {
       setError(err.message)
@@ -86,7 +62,6 @@ export function DocumentManagement() {
   const handlePageSizeChange = (newLimit: number) => {
     setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }))
   }
-
 
   return (
     <div className="space-y-6">
@@ -112,26 +87,16 @@ export function DocumentManagement() {
         
         {!loading && !error && (
           <>
-            <div className="grid gap-4 md:grid-cols-3 mb-6">
-              <div className="rounded-lg border bg-background p-4">
-                <h4 className="font-medium">Total Chunks</h4>
-                <p className="text-2xl font-bold mt-1">{documentStats?.totalDocuments || 0}</p>
-              </div>
-              <div className="rounded-lg border bg-background p-4">
-                <h4 className="font-medium">Database Entries</h4>
-                <p className="text-2xl font-bold mt-1">{documentStats?.totalChunks || 0}</p>
-              </div>
-              <div className="rounded-lg border bg-background p-4">
-                <h4 className="font-medium">Storage Status</h4>
-                <p className="text-sm font-medium mt-1 text-green-600">Active</p>
-              </div>
-            </div>
-
             {documentStats && documentStats.documents.length > 0 ? (
               <>
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Document Chunks</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium">Chunks</h4>
+                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                        {pagination.total}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Show:</span>
                       <select 
@@ -223,7 +188,6 @@ export function DocumentManagement() {
 
       {selectedDocument && (
         <DocumentDetail 
-          id={selectedDocument.id}
           source={selectedDocument.source}
           title={selectedDocument.title}
           onClose={() => setSelectedDocument(null)}
