@@ -1638,6 +1638,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@supabase/ssr@npm:^0.6.1":
+  version: 0.6.1
+  resolution: "@supabase/ssr@npm:0.6.1"
+  dependencies:
+    cookie: ^1.0.1
+  peerDependencies:
+    "@supabase/supabase-js": ^2.43.4
+  checksum: 54152ade021fb888634efca55aa6fbc4dee418ce9c7aa4ccd60f794206a83e175b8c75db6db4781fa9a8b064dde76c025592548982913bb57f6566f3883e3f56
+  languageName: node
+  linkType: hard
+
 "@supabase/storage-js@npm:2.7.0":
   version: 2.7.0
   resolution: "@supabase/storage-js@npm:2.7.0"
@@ -2706,6 +2717,13 @@ __metadata:
   version: 0.0.1
   resolution: "concat-map@npm:0.0.1"
   checksum: 902a9f5d8967a3e2faf138d5cb784b9979bad2e6db5357c5b21c568df4ebe62bcb15108af1b2253744844eb964fc023fbd9afbbbb6ddd0bcc204c6fb5b7bf3af
+  languageName: node
+  linkType: hard
+
+"cookie@npm:^1.0.1":
+  version: 1.0.2
+  resolution: "cookie@npm:1.0.2"
+  checksum: 2c5a6214147ffa7135ce41860c781de17e93128689b0d080d3116468274b3593b607bcd462ac210d3a61f081db3d3b09ae106e18d60b1f529580e95cf2db8a55
   languageName: node
   linkType: hard
 
@@ -4736,6 +4754,7 @@ __metadata:
     "@radix-ui/react-dialog": ^1.1.4
     "@radix-ui/react-popover": ^1.1.4
     "@radix-ui/react-slot": ^1.1.1
+    "@supabase/ssr": ^0.6.1
     "@supabase/supabase-js": ^2.32.0
     "@tailwindcss/typography": ^0.5.16
     "@types/node": 20.12.12
