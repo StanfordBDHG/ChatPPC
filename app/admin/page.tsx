@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ChatAnalytics } from '@/components/admin/ChatAnalytics'
+import { DocumentManagement } from '@/components/admin/DocumentManagement'
+import { BarChart3, FileText } from 'lucide-react'
 
 interface Stats {
   totalConversations: number
@@ -20,7 +22,6 @@ interface Conversation {
 }
 
 export default function AdminDashboard() {
-  const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,47 +31,33 @@ export default function AdminDashboard() {
     fetchData()
   }, [])
 
+  const fetchWithAuth = async (url: string) => {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) throw new Error('Not authenticated')
+
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`${response.status} - ${errorText}`)
+    }
+    
+    return response.json()
+  }
+
   const fetchData = async () => {
     try {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      const [statsData, conversationsData] = await Promise.all([
+        fetchWithAuth('/api/admin/stats'),
+        fetchWithAuth('/api/admin/conversations?limit=5')
+      ])
       
-      if (!session) {
-        setError('Not authenticated')
-        setLoading(false)
-        return
-      }
-
-      // Fetch stats
-      const statsResponse = await fetch('/api/admin/stats', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      })
-      
-      if (!statsResponse.ok) {
-        const errorText = await statsResponse.text()
-        console.log('Stats API error:', statsResponse.status, errorText)
-        throw new Error(`Failed to fetch stats: ${statsResponse.status} - ${errorText}`)
-      }
-      
-      const statsData = await statsResponse.json()
       setStats(statsData)
-
-      // Fetch recent conversations
-      const conversationsResponse = await fetch('/api/admin/conversations?limit=5', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      })
-      
-      if (!conversationsResponse.ok) {
-        throw new Error('Failed to fetch conversations')
-      }
-      
-      const conversationsData = await conversationsResponse.json()
       setConversations(conversationsData.conversations)
-      
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -78,99 +65,44 @@ export default function AdminDashboard() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">ChatPPC Admin Dashboard</h2>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  const renderHeader = (subtitle?: string) => (
+    <div>
+      <h2 className="text-2xl font-bold">ChatPPC Admin Dashboard</h2>
+      <p className={subtitle?.startsWith('Error:') ? 'text-destructive' : 'text-muted-foreground'}>
+        {subtitle || 'Manage conversations and view chat analytics'}
+      </p>
+    </div>
+  )
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">ChatPPC Admin Dashboard</h2>
-          <p className="text-destructive">Error: {error}</p>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <div className="space-y-6">{renderHeader('Loading...')}</div>
+  if (error) return <div className="space-y-6">{renderHeader(`Error: ${error}`)}</div>
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">ChatPPC Admin Dashboard</h2>
-        <p className="text-muted-foreground">
-          Manage conversations and view chat analytics
-        </p>
+      <div className="flex items-center justify-between">
+        {renderHeader()}
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold">Total Conversations</h3>
-          <p className="text-2xl font-bold mt-2">{stats?.totalConversations}</p>
-          <p className="text-sm text-muted-foreground">All time</p>
-        </div>
+      <Tabs defaultValue="analytics" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Chat Analytics
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Document Management
+          </TabsTrigger>
+        </TabsList>
         
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold">Active Sessions</h3>
-          <p className="text-2xl font-bold mt-2">{stats?.activeSessions}</p>
-          <p className="text-sm text-muted-foreground">Last 24 hours</p>
-        </div>
+        <TabsContent value="analytics">
+          <ChatAnalytics stats={stats} conversations={conversations} />
+        </TabsContent>
         
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold">Messages Today</h3>
-          <p className="text-2xl font-bold mt-2">{stats?.messagesToday}</p>
-          <p className="text-sm text-muted-foreground">Since midnight</p>
-        </div>
-        
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold">Average Length</h3>
-          <p className="text-2xl font-bold mt-2">{stats?.averageLength}</p>
-          <p className="text-sm text-muted-foreground">Messages per session</p>
-        </div>
-      </div>
-      
-      <div className="rounded-lg border bg-card p-6">
-        <h3 className="text-lg font-semibold mb-4">Recent Conversations</h3>
-        {conversations.length > 0 ? (
-          <div className="space-y-2">
-            {conversations.map((conversation) => (
-              <div 
-                key={conversation.id} 
-                className="flex items-center justify-between p-3 rounded border hover:bg-accent/50 cursor-pointer transition-colors"
-                onClick={() => router.push(`/admin/conversation/${conversation.id}`)}
-              >
-                <div>
-                  <p className="font-medium">Session {conversation.id.slice(0, 8)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {conversation.message_count} messages • Updated {new Date(conversation.updated_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-muted-foreground">
-                    {new Date(conversation.created_at).toLocaleDateString()}
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={(e) => {
-                    e.stopPropagation()
-                    router.push(`/admin/conversation/${conversation.id}`)
-                  }}>
-                    View →
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-muted-foreground">
-            No conversations yet
-          </div>
-        )}
-      </div>
+        <TabsContent value="documents">
+          <DocumentManagement />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

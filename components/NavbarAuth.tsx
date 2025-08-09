@@ -40,18 +40,31 @@ export function NavbarAuth() {
 
   if (loading) return null
 
-  // Only show auth buttons on admin routes or login page
-  const isAdminRoute = pathname?.startsWith('/admin')
-  const isLoginPage = pathname === '/login'
-  
-  if (!isAdminRoute && !isLoginPage) return null
-
   if (user) {
+    const isAdminPage = pathname?.startsWith('/admin')
+    
     return (
       <div className="flex items-center gap-4">
         <span className="text-sm text-muted-foreground">
           {user.email}
         </span>
+        {isAdminPage ? (
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => router.push('/')}
+          >
+            Chat
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => router.push('/admin')}
+          >
+            Admin
+          </Button>
+        )}
         <Button
           variant="outline"
           size="default"
@@ -63,17 +76,13 @@ export function NavbarAuth() {
     )
   }
 
-  if (isAdminRoute) {
-    return (
-      <Button
-        variant="outline"
-        size="default"
-        onClick={() => router.push('/login')}
-      >
-        Admin Login
-      </Button>
-    )
-  }
-
-  return null
+  return (
+    <Button
+      variant="outline"
+      size="default"
+      onClick={() => router.push('/login')}
+    >
+      Admin
+    </Button>
+  )
 }
