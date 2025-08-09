@@ -14,16 +14,9 @@ interface Stats {
   averageLength: number
 }
 
-interface Conversation {
-  id: string
-  created_at: string
-  updated_at: string
-  message_count: number
-}
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
-  const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,13 +40,8 @@ export default function AdminDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [statsData, conversationsData] = await Promise.all([
-        fetchWithAuth('/api/admin/stats'),
-        fetchWithAuth('/api/admin/conversations?limit=5')
-      ])
-      
+      const statsData = await fetchWithAuth('/api/admin/stats')
       setStats(statsData)
-      setConversations(conversationsData.conversations)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -96,7 +84,7 @@ export default function AdminDashboard() {
         </TabsList>
         
         <TabsContent value="analytics">
-          <ChatAnalytics stats={stats} conversations={conversations} />
+          <ChatAnalytics stats={stats} />
         </TabsContent>
         
         <TabsContent value="documents">

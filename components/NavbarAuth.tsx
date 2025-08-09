@@ -38,8 +38,6 @@ export function NavbarAuth() {
     router.push('/')
   }
 
-  if (loading) return null
-
   if (user) {
     const isAdminPage = pathname?.startsWith('/admin')
     
