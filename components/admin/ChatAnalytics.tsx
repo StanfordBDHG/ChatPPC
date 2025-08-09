@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConversationDetail } from './ConversationDetail'
 import { createClient } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, X, ExternalLink } from 'lucide-react'
 
 interface Stats {
   totalConversations: number
@@ -40,6 +40,17 @@ interface ConversationData {
   }
 }
 
+interface LinkClickStats {
+  mostClickedLinks: {
+    url: string
+    text: string
+    clickCount: number
+    lastClicked: string
+  }[]
+  totalClicks: number
+  uniqueLinks: number
+}
+
 interface ChatAnalyticsProps {
   stats: Stats | null
 }
@@ -55,6 +66,17 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [linkClickStats, setLinkClickStats] = useState<LinkClickStats | null>(null)
+  const [linkClicksLoading, setLinkClicksLoading] = useState(false)
+  const [linkClicksPagination, setLinkClicksPagination] = useState({
+    page: 1,
+    limit: 5,
+    total: 0,
+    pages: 0
+  })
+  const [linkSearchQuery, setLinkSearchQuery] = useState('')
+  const [currentLinkSearch, setCurrentLinkSearch] = useState('')
 
   const PAGE_SIZE_OPTIONS = [5, 10, 20, 50]
 
@@ -76,10 +98,14 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
     return response.json()
   }
 
-  const fetchConversations = useCallback(async () => {
+  const [currentSearch, setCurrentSearch] = useState('')
+
+  const fetchConversations = useCallback(async (searchTerm?: string) => {
     setLoading(true)
     try {
-      const data = await fetchWithAuth(`/api/admin/conversations?page=${pagination.page}&limit=${pagination.limit}`)
+      const search = searchTerm !== undefined ? searchTerm : currentSearch
+      const searchParam = search.trim() ? `&search=${encodeURIComponent(search)}` : ''
+      const data = await fetchWithAuth(`/api/admin/conversations?page=${pagination.page}&limit=${pagination.limit}${searchParam}`)
       setConversations(data.conversations)
       setPagination(data.pagination)
       setError(null)
@@ -88,11 +114,29 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
     } finally {
       setLoading(false)
     }
-  }, [pagination.page, pagination.limit])
+  }, [pagination.page, pagination.limit, currentSearch])
+
+  const fetchLinkClickStats = useCallback(async (searchTerm?: string) => {
+    setLinkClicksLoading(true)
+    try {
+      const search = searchTerm !== undefined ? searchTerm : currentLinkSearch
+      const searchParam = search.trim() ? `&search=${encodeURIComponent(search)}` : ''
+      const data = await fetchWithAuth(`/api/admin/link-clicks?page=${linkClicksPagination.page}&limit=${linkClicksPagination.limit}${searchParam}`)
+      setLinkClickStats(data)
+      if (data.pagination) {
+        setLinkClicksPagination(data.pagination)
+      }
+    } catch (err: any) {
+      console.error('Error fetching link click stats:', err)
+    } finally {
+      setLinkClicksLoading(false)
+    }
+  }, [linkClicksPagination.page, linkClicksPagination.limit, currentLinkSearch])
 
   useEffect(() => {
     fetchConversations()
-  }, [fetchConversations])
+    fetchLinkClickStats()
+  }, [fetchConversations, fetchLinkClickStats])
 
   const handlePageChange = (newPage: number) => {
     setPagination(prev => ({ ...prev, page: newPage }))
@@ -100,6 +144,48 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
 
   const handlePageSizeChange = (newLimit: number) => {
     setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }))
+  }
+
+  const handleLinkClicksPageChange = (newPage: number) => {
+    setLinkClicksPagination(prev => ({ ...prev, page: newPage }))
+  }
+
+  const handleLinkClicksPageSizeChange = (newLimit: number) => {
+    setLinkClicksPagination(prev => ({ ...prev, limit: newLimit, page: 1 }))
+  }
+
+  const handleLinkSearchChange = (value: string) => {
+    setLinkSearchQuery(value)
+    // Don't automatically reset pagination or fetch when typing
+  }
+
+  const handleLinkSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setCurrentLinkSearch(linkSearchQuery)
+    setLinkClicksPagination(prev => ({ ...prev, page: 1 })) // Reset to page 1 when searching
+    fetchLinkClickStats(linkSearchQuery)
+  }
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    // Don't automatically reset pagination or fetch when typing
+  }
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setCurrentSearch(searchQuery)
+    setPagination(prev => ({ ...prev, page: 1 })) // Reset to page 1 when searching
+    fetchConversations(searchQuery)
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   const statCards: StatCard[] = [
@@ -124,6 +210,62 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Recent Conversations</h3>
+        </div>
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4 flex-1">
+            {/* Search Bar */}
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSearchSubmit()
+                    }
+                  }}
+                  className="w-64 pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setCurrentSearch('')
+                      setPagination(prev => ({ ...prev, page: 1 }))
+                      fetchConversations('')
+                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={loading}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Button 
+                type="button"
+                variant="outline" 
+                size="sm"
+                disabled={loading}
+                onClick={() => handleSearchSubmit()}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
+            
+            {currentSearch && (
+              <p className="text-sm text-muted-foreground">
+                Searching for: &ldquo;{currentSearch}&rdquo; • {pagination.total} result{pagination.total !== 1 ? 's' : ''} found
+              </p>
+            )}
+          </div>
+          
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Show:</span>
@@ -141,7 +283,7 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={fetchConversations}
+              onClick={() => fetchConversations()}
               disabled={loading}
             >
               {loading ? 'Loading...' : 'Refresh'}
@@ -171,7 +313,7 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
                   <div className="flex-1">
                     <p className="font-medium">Session {conversation.id.slice(0, 8)}</p>
                     <p className="text-sm text-muted-foreground mb-1">
-                      {conversation.message_count} messages • Updated {new Date(conversation.updated_at).toLocaleDateString()}
+                      {conversation.message_count} messages • Created: {formatDate(conversation.created_at)} • Last Updated: {formatDate(conversation.updated_at)}
                     </p>
                     {conversation.first_message && (
                       <p className="text-sm text-gray-600 italic">
@@ -180,9 +322,6 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="text-sm text-muted-foreground">
-                      {new Date(conversation.created_at).toLocaleDateString()}
-                    </div>
                     <Button variant="ghost" size="sm" onClick={(e) => {
                       e.stopPropagation()
                       setSelectedConversationId(conversation.id)
@@ -230,6 +369,185 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             No conversations found
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Most Clicked Links</h3>
+        </div>
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4 flex-1">
+            {/* Search Bar */}
+            <form onSubmit={handleLinkSearchSubmit} className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search links..."
+                  value={linkSearchQuery}
+                  onChange={(e) => handleLinkSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleLinkSearchSubmit()
+                    }
+                  }}
+                  className="w-64 pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={linkClicksLoading}
+                />
+                {linkSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLinkSearchQuery('')
+                      setCurrentLinkSearch('')
+                      setLinkClicksPagination(prev => ({ ...prev, page: 1 }))
+                      fetchLinkClickStats('')
+                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={linkClicksLoading}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Button 
+                type="button"
+                variant="outline" 
+                size="sm"
+                disabled={linkClicksLoading}
+                onClick={() => handleLinkSearchSubmit()}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
+            
+            {currentLinkSearch && (
+              <p className="text-sm text-muted-foreground">
+                Searching for: &ldquo;{currentLinkSearch}&rdquo; • {linkClicksPagination.total} result{linkClicksPagination.total !== 1 ? 's' : ''} found
+              </p>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Show:</span>
+              <select 
+                value={linkClicksPagination.limit}
+                onChange={(e) => handleLinkClicksPageSizeChange(Number(e.target.value))}
+                className="border border-gray-300 rounded px-2 py-1 text-sm bg-white min-w-[60px]"
+                disabled={linkClicksLoading}
+              >
+                {PAGE_SIZE_OPTIONS.map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => fetchLinkClickStats()}
+              disabled={linkClicksLoading}
+            >
+              {linkClicksLoading ? 'Loading...' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
+        
+        {linkClicksLoading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Loading link statistics...
+          </div>
+        ) : linkClickStats && linkClickStats.mostClickedLinks.length > 0 ? (
+          <>
+            {/* Links Table */}
+            <div className="overflow-x-auto mb-4">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium">Link Name</th>
+                    <th className="text-left p-3 font-medium">URL</th>
+                    <th className="text-left p-3 font-medium">Last Clicked</th>
+                    <th className="text-right p-3 font-medium">Clicks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linkClickStats.mostClickedLinks.map((link) => (
+                    <tr key={link.url} className="border-b hover:bg-accent/50">
+                      <td className="p-3">
+                        <a 
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                        >
+                          {link.text}
+                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                        </a>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm text-muted-foreground truncate max-w-xs block">
+                          {link.url}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm text-muted-foreground">
+                          {formatDate(link.lastClicked)}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <span className="font-bold text-green-600">
+                          {link.clickCount}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between border-t pt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {((linkClicksPagination.page - 1) * linkClicksPagination.limit) + 1} to {Math.min(linkClicksPagination.page * linkClicksPagination.limit, linkClicksPagination.total)} of {linkClicksPagination.total} links
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleLinkClicksPageChange(linkClicksPagination.page - 1)}
+                  disabled={linkClicksPagination.page <= 1 || linkClicksLoading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                
+                <span className="text-sm font-medium px-3">
+                  Page {linkClicksPagination.page} of {linkClicksPagination.pages}
+                </span>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleLinkClicksPageChange(linkClicksPagination.page + 1)}
+                  disabled={linkClicksPagination.page >= linkClicksPagination.pages || linkClicksLoading}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>No link clicks recorded yet.</p>
+            <p className="text-sm mt-2">
+              Link clicks will appear here once users start clicking on links in chat responses.
+            </p>
           </div>
         )}
       </div>

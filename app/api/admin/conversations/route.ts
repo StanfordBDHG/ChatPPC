@@ -7,6 +7,7 @@ async function handleGetConversations(req: NextRequest, _user: any) {
   const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || '';
     const offset = (page - 1) * limit;
     
     const client = createClient(
@@ -14,8 +15,33 @@ async function handleGetConversations(req: NextRequest, _user: any) {
       process.env.SUPABASE_PRIVATE_KEY!,
     );
     
-    // Get conversations with message count
-    const { data: conversations, error } = await client
+    let conversationIds: string[] = [];
+    
+    if (search.trim()) {
+      // Search for conversations containing the search text in messages
+      const { data: matchingMessages } = await client
+        .from('chat_messages')
+        .select('session_id')
+        .ilike('content', `%${search.trim()}%`);
+      
+      conversationIds = Array.from(new Set(matchingMessages?.map(m => m.session_id) || []));
+      
+      if (conversationIds.length === 0) {
+        // No matching conversations found
+        return NextResponse.json({
+          conversations: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            pages: 0,
+          },
+        });
+      }
+    }
+    
+    // Build the query for conversations
+    let conversationsQuery = client
       .from('chat_sessions')
       .select(`
         id,
@@ -23,22 +49,36 @@ async function handleGetConversations(req: NextRequest, _user: any) {
         updated_at,
         chat_messages(count)
       `)
-      .order('updated_at', { ascending: false })
+      .order('updated_at', { ascending: false });
+    
+    // Apply search filter if we have matching conversation IDs
+    if (search.trim() && conversationIds.length > 0) {
+      conversationsQuery = conversationsQuery.in('id', conversationIds);
+    }
+    
+    // Apply pagination
+    const { data: conversations, error } = await conversationsQuery
       .range(offset, offset + limit - 1);
     
     if (error) throw error;
     
     // Get total count for pagination
-    const { count: totalCount } = await client
+    let totalCountQuery = client
       .from('chat_sessions')
       .select('*', { count: 'exact', head: true });
     
+    if (search.trim() && conversationIds.length > 0) {
+      totalCountQuery = totalCountQuery.in('id', conversationIds);
+    }
+    
+    const { count: totalCount } = await totalCountQuery;
+    
     // Get first user message for each conversation
-    const conversationIds = conversations?.map(c => c.id) || [];
+    const resultConversationIds = conversations?.map(c => c.id) || [];
     const { data: firstMessages } = await client
       .from('chat_messages')
       .select('session_id, content, role')
-      .in('session_id', conversationIds)
+      .in('session_id', resultConversationIds)
       .eq('role', 'user')
       .order('sequence_order', { ascending: true });
     

@@ -74,11 +74,13 @@ export function NavbarAuth() {
     )
   }
 
+  // Show Admin button for non-logged in users (including during loading)
   return (
     <Button
       variant="outline"
       size="default"
       onClick={() => router.push('/login')}
+      disabled={loading}
     >
       Admin
     </Button>
