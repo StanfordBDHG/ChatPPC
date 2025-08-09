@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChatAnalytics } from '@/components/admin/ChatAnalytics'
@@ -27,10 +27,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
   const fetchWithAuth = async (url: string) => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -49,7 +45,7 @@ export default function AdminDashboard() {
     return response.json()
   }
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [statsData, conversationsData] = await Promise.all([
         fetchWithAuth('/api/admin/stats'),
@@ -63,7 +59,11 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const renderHeader = (subtitle?: string) => (
     <div>

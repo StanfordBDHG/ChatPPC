@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { X, User, Bot } from 'lucide-react'
@@ -36,10 +36,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchConversationDetail()
-  }, [conversationId])
-
   const fetchWithAuth = async (url: string) => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -58,7 +54,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     return response.json()
   }
 
-  const fetchConversationDetail = async () => {
+  const fetchConversationDetail = useCallback(async () => {
     try {
       const data = await fetchWithAuth(`/api/admin/conversations/${conversationId}`)
       setConversationDetail(data)
@@ -67,7 +63,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     } finally {
       setLoading(false)
     }
-  }
+  }, [conversationId])
+
+  useEffect(() => {
+    fetchConversationDetail()
+  }, [fetchConversationDetail])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

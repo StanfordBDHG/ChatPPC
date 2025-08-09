@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { withAdminAuth } from "@/lib/adminAuth";
 
-async function handleGetDocumentChunks(req: NextRequest, _user: any, { params }: { params: { source: string } }) {
+async function handleGetDocumentChunks(req: NextRequest, _user: any, { params }: { params: Promise<{ source: string }> }) {
   const client = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_PRIVATE_KEY!,
   );
   
   try {
-    const source = decodeURIComponent(params.source);
+    const { source: rawSource } = await params;
+    const source = decodeURIComponent(rawSource);
     
     // Get all chunks for this specific document source
     const { data: chunks, error } = await client
@@ -58,6 +59,6 @@ async function handleGetDocumentChunks(req: NextRequest, _user: any, { params }:
   }
 }
 
-export async function GET(req: NextRequest, context: { params: { source: string } }) {
-  return withAdminAuth((req: NextRequest, user: any) => handleGetDocumentChunks(req, user, context))(req);
+export async function GET(req: NextRequest, { params }: { params: Promise<{ source: string }> }) {
+  return withAdminAuth((req: NextRequest, user: any) => handleGetDocumentChunks(req, user, { params }))(req);
 }

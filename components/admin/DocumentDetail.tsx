@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
@@ -29,10 +29,6 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchDocumentDetail()
-  }, [source])
-
   const fetchWithAuth = async (url: string) => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -51,7 +47,7 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
     return response.json()
   }
 
-  const fetchDocumentDetail = async () => {
+  const fetchDocumentDetail = useCallback(async () => {
     try {
       const encodedSource = encodeURIComponent(source)
       const data = await fetchWithAuth(`/api/admin/documents/${encodedSource}`)
@@ -61,7 +57,11 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
     } finally {
       setLoading(false)
     }
-  }
+  }, [source])
+
+  useEffect(() => {
+    fetchDocumentDetail()
+  }, [fetchDocumentDetail])
 
   if (loading) {
     return (

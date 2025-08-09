@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { DocumentDetail } from './DocumentDetail'
@@ -23,10 +23,6 @@ export function DocumentManagement() {
   const [error, setError] = useState<string | null>(null)
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
 
-  useEffect(() => {
-    fetchDocuments()
-  }, [])
-
   const fetchWithAuth = async (url: string) => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -45,7 +41,7 @@ export function DocumentManagement() {
     return response.json()
   }
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       const data = await fetchWithAuth('/api/admin/documents')
       setDocumentStats(data)
@@ -54,7 +50,11 @@ export function DocumentManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [fetchDocuments])
 
 
   if (loading) {

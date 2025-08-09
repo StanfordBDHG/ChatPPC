@@ -72,7 +72,7 @@ export function ChatAnalytics({ stats, conversations }: ChatAnalyticsProps) {
                   </p>
                   {conversation.first_message && (
                     <p className="text-sm text-gray-600 italic">
-                      "{conversation.first_message.content}"
+                      &ldquo;{conversation.first_message.content}&rdquo;
                     </p>
                   )}
                 </div>

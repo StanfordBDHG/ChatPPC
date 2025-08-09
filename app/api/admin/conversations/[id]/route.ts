@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { withAdminAuth } from "@/lib/adminAuth";
 
-async function handleGetConversation(req: NextRequest, _user: any, { params }: { params: { id: string } }) {
-  const conversationId = params.id;
+async function handleGetConversation(req: NextRequest, _user: any, { params }: { params: Promise<{ id: string }> }) {
+  const { id: conversationId } = await params;
   
   const client = createClient(
     process.env.SUPABASE_URL!,

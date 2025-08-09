@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase'
@@ -34,9 +34,9 @@ export default function ConversationDetail() {
 
   useEffect(() => {
     fetchConversation()
-  }, [params.id])
+  }, [fetchConversation])
 
-  const fetchConversation = async () => {
+  const fetchConversation = useCallback(async () => {
     try {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
@@ -66,7 +66,7 @@ export default function ConversationDetail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id])
 
   if (loading) {
     return (
@@ -151,7 +151,7 @@ export default function ConversationDetail() {
           <h3 className="text-lg font-semibold">Messages</h3>
         </div>
         <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
-          {data.messages.map((message, index) => (
+          {data.messages.map((message) => (
             <div
               key={message.id}
               className={`rounded-lg p-3 ${
