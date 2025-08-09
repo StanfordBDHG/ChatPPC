@@ -1,7 +1,8 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { ConversationDetail } from './ConversationDetail'
 
 interface Stats {
   totalConversations: number
@@ -15,6 +16,10 @@ interface Conversation {
   created_at: string
   updated_at: string
   message_count: number
+  first_message?: {
+    content: string
+    role: string
+  } | null
 }
 
 interface StatCard {
@@ -29,7 +34,7 @@ interface ChatAnalyticsProps {
 }
 
 export function ChatAnalytics({ stats, conversations }: ChatAnalyticsProps) {
-  const router = useRouter()
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
 
   const statCards: StatCard[] = [
     { title: 'Total Conversations', value: stats?.totalConversations, description: 'All time' },
@@ -58,13 +63,18 @@ export function ChatAnalytics({ stats, conversations }: ChatAnalyticsProps) {
               <div 
                 key={conversation.id} 
                 className="flex items-center justify-between p-3 rounded border hover:bg-accent/50 cursor-pointer transition-colors"
-                onClick={() => router.push(`/admin/conversation/${conversation.id}`)}
+                onClick={() => setSelectedConversationId(conversation.id)}
               >
-                <div>
+                <div className="flex-1">
                   <p className="font-medium">Session {conversation.id.slice(0, 8)}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mb-1">
                     {conversation.message_count} messages • Updated {new Date(conversation.updated_at).toLocaleDateString()}
                   </p>
+                  {conversation.first_message && (
+                    <p className="text-sm text-gray-600 italic">
+                      "{conversation.first_message.content}"
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-sm text-muted-foreground">
@@ -72,7 +82,7 @@ export function ChatAnalytics({ stats, conversations }: ChatAnalyticsProps) {
                   </div>
                   <Button variant="ghost" size="sm" onClick={(e) => {
                     e.stopPropagation()
-                    router.push(`/admin/conversation/${conversation.id}`)
+                    setSelectedConversationId(conversation.id)
                   }}>
                     View →
                   </Button>
@@ -86,6 +96,13 @@ export function ChatAnalytics({ stats, conversations }: ChatAnalyticsProps) {
           </div>
         )}
       </div>
+
+      {selectedConversationId && (
+        <ConversationDetail 
+          conversationId={selectedConversationId}
+          onClose={() => setSelectedConversationId(null)}
+        />
+      )}
     </div>
   )
 }

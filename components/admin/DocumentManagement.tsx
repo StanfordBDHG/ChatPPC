@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
+import { DocumentDetail } from './DocumentDetail'
 
 interface Document {
   source: string
@@ -20,6 +21,7 @@ export function DocumentManagement() {
   const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
 
   useEffect(() => {
     fetchDocuments()
@@ -111,7 +113,8 @@ export function DocumentManagement() {
             {documentStats.documents.map((doc) => (
               <div 
                 key={doc.source} 
-                className="border rounded-lg p-4 hover:bg-accent/50 transition-colors"
+                className="border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                onClick={() => setSelectedDocument(doc)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -136,6 +139,14 @@ export function DocumentManagement() {
           </div>
         )}
       </div>
+
+      {selectedDocument && (
+        <DocumentDetail 
+          source={selectedDocument.source}
+          title={selectedDocument.title}
+          onClose={() => setSelectedDocument(null)}
+        />
+      )}
     </div>
   )
 }

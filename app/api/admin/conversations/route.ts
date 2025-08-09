@@ -33,13 +33,38 @@ async function handleGetConversations(req: NextRequest, _user: any) {
       .from('chat_sessions')
       .select('*', { count: 'exact', head: true });
     
+    // Get first user message for each conversation
+    const conversationIds = conversations?.map(c => c.id) || [];
+    const { data: firstMessages } = await client
+      .from('chat_messages')
+      .select('session_id, content, role')
+      .in('session_id', conversationIds)
+      .eq('role', 'user')
+      .order('sequence_order', { ascending: true });
+    
+    // Create a map of session_id to first user message
+    const firstMessageMap = new Map();
+    firstMessages?.forEach(msg => {
+      // Only set if we haven't seen this session_id yet (gets the first user message)
+      if (!firstMessageMap.has(msg.session_id)) {
+        firstMessageMap.set(msg.session_id, msg);
+      }
+    });
+    
     // Format the response
-    const formattedConversations = conversations?.map(session => ({
-      id: session.id,
-      created_at: session.created_at,
-      updated_at: session.updated_at,
-      message_count: session.chat_messages?.[0]?.count || 0,
-    })) || [];
+    const formattedConversations = conversations?.map(session => {
+      const firstMessage = firstMessageMap.get(session.id);
+      return {
+        id: session.id,
+        created_at: session.created_at,
+        updated_at: session.updated_at,
+        message_count: session.chat_messages?.[0]?.count || 0,
+        first_message: firstMessage ? {
+          content: firstMessage.content.substring(0, 100) + (firstMessage.content.length > 100 ? '...' : ''),
+          role: firstMessage.role
+        } : null
+      };
+    }) || [];
     
     return NextResponse.json({
       conversations: formattedConversations,
