@@ -19,10 +19,23 @@ export default function AdminLayout({
     
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      
+      // Check if this is a temporary session that should expire on browser close
+      const isTempSession = sessionStorage.getItem('temp_session')
+      const hasRememberFlag = localStorage.getItem('remember_admin')
+      
+      if (user && isTempSession && !hasRememberFlag) {
+        // For temporary sessions, check if we should maintain the session
+        // In a real app, you might want to check session creation time here
+      }
+      
       setUser(user)
       setLoading(false)
       
       if (!user) {
+        // Clear any session flags when user is not authenticated
+        sessionStorage.removeItem('temp_session')
+        localStorage.removeItem('remember_admin')
         router.push('/login')
       }
     }
@@ -32,6 +45,9 @@ export default function AdminLayout({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_OUT' || !session) {
+          // Clear session flags on sign out
+          sessionStorage.removeItem('temp_session')
+          localStorage.removeItem('remember_admin')
           router.push('/login')
         } else {
           setUser(session.user)

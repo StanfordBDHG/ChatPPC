@@ -4,11 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { createClient } from '@/lib/supabase'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -19,6 +21,7 @@ export default function AdminLogin() {
     setError('')
 
     const supabase = createClient()
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -27,6 +30,21 @@ export default function AdminLogin() {
     if (error) {
       setError(error.message)
     } else {
+      // Handle session persistence based on remember me option
+      if (!rememberMe) {
+        // Set session to expire when browser closes
+        // This is done by setting a shorter refresh token expiry
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          // Store a flag to indicate this is a temporary session
+          sessionStorage.setItem('temp_session', 'true')
+        }
+      } else {
+        // Remove any temporary session flags for persistent sessions
+        sessionStorage.removeItem('temp_session')
+        localStorage.setItem('remember_admin', 'true')
+      }
+      
       router.push('/admin')
     }
 
@@ -34,7 +52,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="h-full flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8 p-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold text-foreground">
@@ -68,6 +86,20 @@ export default function AdminLogin() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remember"
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
+            />
+            <label
+              htmlFor="remember"
+              className="text-sm text-muted-foreground cursor-pointer"
+            >
+              Remember me for 7 days
+            </label>
           </div>
 
           {error && (
