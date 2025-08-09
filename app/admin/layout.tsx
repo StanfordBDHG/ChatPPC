@@ -56,7 +56,7 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container py-6">
+      <main className="container py-6 px-6 mx-auto">
         {children}
       </main>
     </div>

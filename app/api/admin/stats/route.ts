@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { withAdminAuth } from "@/lib/adminAuth";
 
-// Remove edge runtime for better debugging
-// export const runtime = "edge";
 
 async function handleGetStats(_req: NextRequest, _user: any) {
   const client = createClient(

@@ -2,8 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
 
-export function createServerSupabaseClient() {
-  const cookieStore = cookies()
+export async function createServerSupabaseClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +34,7 @@ export async function getUser(request?: NextRequest) {
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.substring(7)
       
-      const supabase = createServerSupabaseClient()
+      const supabase = await createServerSupabaseClient()
       try {
         const { data: { user }, error } = await supabase.auth.getUser(token)
         if (error || !user) {
@@ -48,7 +48,7 @@ export async function getUser(request?: NextRequest) {
   }
   
   // Fallback to cookie-based auth
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   try {
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error || !user) {
