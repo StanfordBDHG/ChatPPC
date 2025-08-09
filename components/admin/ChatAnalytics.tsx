@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConversationDetail } from './ConversationDetail'
 import { createClient } from '@/lib/supabase'
@@ -76,7 +76,7 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
     return response.json()
   }
 
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     setLoading(true)
     try {
       const data = await fetchWithAuth(`/api/admin/conversations?page=${pagination.page}&limit=${pagination.limit}`)
@@ -88,11 +88,11 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pagination.page, pagination.limit])
 
   useEffect(() => {
     fetchConversations()
-  }, [pagination.page, pagination.limit])
+  }, [fetchConversations])
 
   const handlePageChange = (newPage: number) => {
     setPagination(prev => ({ ...prev, page: newPage }))
@@ -130,7 +130,7 @@ export function ChatAnalytics({ stats }: ChatAnalyticsProps) {
               <select 
                 value={pagination.limit}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="border border-input rounded px-2 py-1 text-sm"
+                className="border border-gray-300 rounded px-2 py-1 text-sm bg-white min-w-[60px]"
                 disabled={loading}
               >
                 {PAGE_SIZE_OPTIONS.map(size => (
