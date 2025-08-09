@@ -39,30 +39,11 @@ export function NavbarAuth() {
   }
 
   if (user) {
-    const isAdminPage = pathname?.startsWith('/admin')
-    
     return (
       <div className="flex items-center gap-4">
         <span className="text-sm text-muted-foreground">
           {user.email}
         </span>
-        {isAdminPage ? (
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => router.push('/')}
-          >
-            Chat
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => router.push('/admin')}
-          >
-            Admin
-          </Button>
-        )}
         <Button
           variant="outline"
           size="default"
@@ -73,16 +54,4 @@ export function NavbarAuth() {
       </div>
     )
   }
-
-  // Show Admin button for non-logged in users (including during loading)
-  return (
-    <Button
-      variant="outline"
-      size="default"
-      onClick={() => router.push('/login')}
-      disabled={loading}
-    >
-      Admin
-    </Button>
-  )
 }
