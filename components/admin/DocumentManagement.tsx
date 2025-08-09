@@ -7,8 +7,11 @@ import { DocumentDetail } from './DocumentDetail'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface Document {
+  id: number
   source: string
   title: string
+  content: string
+  metadata?: Record<string, any>
   chunkCount: number
 }
 
@@ -57,6 +60,7 @@ export function DocumentManagement() {
   }
 
   const fetchDocuments = useCallback(async () => {
+    setLoading(true)
     try {
       const data = await fetchWithAuth(`/api/admin/documents?page=${pagination.page}&limit=${pagination.limit}`)
       setDocumentStats(data)
@@ -89,29 +93,6 @@ export function DocumentManagement() {
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Document Management</h3>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Show:</span>
-              <select 
-                value={pagination.limit}
-                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="border border-gray-300 rounded px-2 py-1 text-sm bg-white min-w-[60px]"
-                disabled={loading}
-              >
-                {PAGE_SIZE_OPTIONS.map(size => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-            <Button 
-              onClick={fetchDocuments} 
-              variant="outline" 
-              size="sm"
-              disabled={loading}
-            >
-              {loading ? 'Loading...' : 'Refresh'}
-            </Button>
-          </div>
         </div>
         
         {loading && !documentStats && (
@@ -133,11 +114,11 @@ export function DocumentManagement() {
           <>
             <div className="grid gap-4 md:grid-cols-3 mb-6">
               <div className="rounded-lg border bg-background p-4">
-                <h4 className="font-medium">Total Documents</h4>
+                <h4 className="font-medium">Total Chunks</h4>
                 <p className="text-2xl font-bold mt-1">{documentStats?.totalDocuments || 0}</p>
               </div>
               <div className="rounded-lg border bg-background p-4">
-                <h4 className="font-medium">Total Chunks</h4>
+                <h4 className="font-medium">Database Entries</h4>
                 <p className="text-2xl font-bold mt-1">{documentStats?.totalChunks || 0}</p>
               </div>
               <div className="rounded-lg border bg-background p-4">
@@ -149,10 +130,33 @@ export function DocumentManagement() {
             {documentStats && documentStats.documents.length > 0 ? (
               <>
                 <div className="space-y-3 mb-4">
-                  <h4 className="font-medium">Document List</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Document Chunks</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Show:</span>
+                      <select 
+                        value={pagination.limit}
+                        onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm bg-white min-w-[60px]"
+                        disabled={loading}
+                      >
+                        {PAGE_SIZE_OPTIONS.map(size => (
+                          <option key={size} value={size}>{size}</option>
+                        ))}
+                      </select>
+                      <Button 
+                        onClick={fetchDocuments} 
+                        variant="outline" 
+                        size="sm"
+                        disabled={loading}
+                      >
+                        {loading ? 'Loading...' : 'Refresh'}
+                      </Button>
+                    </div>
+                  </div>
                   {documentStats.documents.map((doc) => (
                     <div 
-                      key={doc.source} 
+                      key={doc.id} 
                       className="border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
                       onClick={() => setSelectedDocument(doc)}
                     >
@@ -162,9 +166,10 @@ export function DocumentManagement() {
                           {doc.source !== doc.title && (
                             <p className="text-sm text-muted-foreground mb-2">{doc.source}</p>
                           )}
+                          <p className="text-sm text-muted-foreground mt-2">{doc.content}</p>
                         </div>
                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-4">
-                          {doc.chunkCount} chunks
+                          ID: {doc.id}
                         </span>
                       </div>
                     </div>
@@ -174,7 +179,7 @@ export function DocumentManagement() {
                 {/* Pagination Controls */}
                 <div className="flex items-center justify-between border-t pt-4">
                   <div className="text-sm text-muted-foreground">
-                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} documents
+                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} document chunks
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -206,9 +211,9 @@ export function DocumentManagement() {
               </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                <p>No documents found in the database.</p>
+                <p>No document chunks found in the database.</p>
                 <p className="text-sm mt-2">
-                  Documents will appear here once they are ingested through the system.
+                  Document chunks will appear here once they are ingested through the system.
                 </p>
               </div>
             )}
@@ -218,6 +223,7 @@ export function DocumentManagement() {
 
       {selectedDocument && (
         <DocumentDetail 
+          id={selectedDocument.id}
           source={selectedDocument.source}
           title={selectedDocument.title}
           onClose={() => setSelectedDocument(null)}

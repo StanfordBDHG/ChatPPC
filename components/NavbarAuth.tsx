@@ -38,6 +38,18 @@ export function NavbarAuth() {
     router.push('/')
   }
 
+  const handleSignIn = () => {
+    router.push('/login')
+  }
+
+  const handleDashboard = () => {
+    router.push('/admin')
+  }
+
+  if (loading) {
+    return null
+  }
+
   if (user) {
     return (
       <div className="flex items-center gap-4">
@@ -47,11 +59,28 @@ export function NavbarAuth() {
         <Button
           variant="outline"
           size="default"
+          onClick={handleDashboard}
+        >
+          Dashboard
+        </Button>
+        <Button
+          variant="outline"
+          size="default"
           onClick={handleSignOut}
         >
-          Sign out
+          Log Out
         </Button>
       </div>
     )
   }
+
+  return (
+    <Button
+      variant="outline"
+      size="default"
+      onClick={handleSignIn}
+    >
+      Admin Login
+    </Button>
+  )
 }

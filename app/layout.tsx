@@ -62,6 +62,14 @@ export default function RootLayout({
         <div className="bg-secondary grid grid-rows-[auto,1fr] h-[100dvh]">
           <div className="grid grid-cols-[1fr,auto] gap-2 p-4">
             <div className="flex gap-4 flex-row md:flex-row items-center">
+              {/* <a
+                href="https://js.langchain.com"
+                rel="noopener noreferrer"
+                target="_blank"
+                className="flex items-center gap-2"
+              >
+                <Logo />
+              </a> */}
               <nav className="flex gap-1 flex-row md:flex-row">
                 <span className="[color:rgb(128,37,34)]"><strong>ChatPPC</strong></span>
               </nav>

@@ -14,46 +14,43 @@ async function handleGetDocuments(req: NextRequest, _user: any) {
   );
   
   try {
-    // Get all document chunks to group by source first
-    const { data: allChunks, error } = await client
+    // Get total count for pagination
+    const { count: totalCount, error: countError } = await client
+      .from('documents')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      throw countError;
+    }
+
+    // Get paginated document chunks
+    const { data: documentChunks, error } = await client
       .from('documents')
       .select('id, content, metadata')
-      .limit(5000); // Get chunks to properly group documents
+      .range(offset, offset + limit - 1)
+      .order('id', { ascending: true });
     
     if (error) {
       throw error;
     }
 
-    // Group chunks by document source (using metadata.source or other identifying field)
-    const documentsMap = new Map();
-    
-    allChunks?.forEach(chunk => {
-      const source = chunk.metadata?.source || 'Unknown Document';
-      const title = chunk.metadata?.title || chunk.metadata?.source || 'Untitled';
-      
-      if (!documentsMap.has(source)) {
-        documentsMap.set(source, {
-          source,
-          title,
-          chunkCount: 0
-        });
-      }
-      
-      const doc = documentsMap.get(source);
-      doc.chunkCount++;
-    });
+    // Transform chunks to match expected format
+    const documents = documentChunks?.map(chunk => ({
+      id: chunk.id,
+      source: chunk.metadata?.source || 'Unknown Document',
+      title: chunk.metadata?.title || chunk.metadata?.source || `Chunk ${chunk.id}`,
+      content: chunk.content ? chunk.content.substring(0, 100) + '...' : 'No content',
+      metadata: chunk.metadata || {},
+      chunkCount: 1 // Each row is one chunk
+    })) || [];
 
-    const allDocuments = Array.from(documentsMap.values());
-    const totalDocuments = allDocuments.length;
+    const totalDocuments = totalCount || 0;
     const totalPages = Math.ceil(totalDocuments / limit);
-    
-    // Apply pagination to the grouped documents
-    const paginatedDocuments = allDocuments.slice(offset, offset + limit);
 
     const documentStats = {
       totalDocuments: totalDocuments,
-      totalChunks: allChunks?.length || 0,
-      documents: paginatedDocuments,
+      totalChunks: totalDocuments, // Each document is now a chunk
+      documents: documents,
       pagination: {
         page,
         limit,
