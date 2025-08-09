@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export function withAdminAuth(handler: (req: NextRequest, user: any) => Promise<NextResponse>) {
-  return async function(req: NextRequest) {
+export function withAdminAuth(handler: (req: NextRequest, user: any, context?: any) => Promise<NextResponse>) {
+  return async function(req: NextRequest, context?: any) {
     try {
       // Verify user is authenticated
       const authHeader = req.headers.get('authorization')
@@ -29,7 +29,7 @@ export function withAdminAuth(handler: (req: NextRequest, user: any) => Promise<
       console.log('Auth successful for:', user.email)
       
       // Call the actual handler with authenticated user
-      return handler(req, user)
+      return handler(req, user, context)
       
     } catch (error: any) {
       console.error("Error in admin auth middleware:", error);

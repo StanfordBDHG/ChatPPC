@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { Button } from '@/components/ui/button'
 
 interface Stats {
   totalConversations: number
@@ -18,6 +20,7 @@ interface Conversation {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
@@ -137,15 +140,27 @@ export default function AdminDashboard() {
         {conversations.length > 0 ? (
           <div className="space-y-2">
             {conversations.map((conversation) => (
-              <div key={conversation.id} className="flex items-center justify-between p-3 rounded border">
+              <div 
+                key={conversation.id} 
+                className="flex items-center justify-between p-3 rounded border hover:bg-accent/50 cursor-pointer transition-colors"
+                onClick={() => router.push(`/admin/conversation/${conversation.id}`)}
+              >
                 <div>
                   <p className="font-medium">Session {conversation.id.slice(0, 8)}</p>
                   <p className="text-sm text-muted-foreground">
                     {conversation.message_count} messages • Updated {new Date(conversation.updated_at).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {new Date(conversation.created_at).toLocaleDateString()}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(conversation.created_at).toLocaleDateString()}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={(e) => {
+                    e.stopPropagation()
+                    router.push(`/admin/conversation/${conversation.id}`)
+                  }}>
+                    View →
+                  </Button>
                 </div>
               </div>
             ))}
