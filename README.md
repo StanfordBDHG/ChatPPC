@@ -95,3 +95,11 @@ The script will:
 - Split the content into chunks with appropriate overlap
 - Generate embeddings using OpenAI
 - Store the embeddings in your Supabase vector database
+
+## Admin Dashboard
+
+To access the admin dashboard for viewing conversation analytics and managing documents:
+
+1. Navigate to the Supabase dashboard and add a new user under `Authentication` with an email and password. Currently only admins have individual user accounts, whereas users access without an account, therefore *any user created in Supabase Authentication is automatically considered an admin*.
+2. Navigate to `/admin` or click the `Admin Login` button in the navbar.
+3. Sign in with admin credentials.
