@@ -72,7 +72,7 @@ export default function RootLayout({
                 <Logo />
               </a> */}
               <nav className="flex gap-1 flex-row md:flex-row">
-                <Link href="/" className="[color:rgb(128,37,34)]"><strong>ChatPPC</strong></Link>
+                <Link href="/" className="text-red-800 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"><strong>ChatPPC</strong></Link>
               </nav>
               <Button asChild variant="outline" size="default" className="w-fit">
                 <a
