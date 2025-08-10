@@ -188,7 +188,7 @@ export function DocumentManagement() {
 
       {selectedDocument && (
         <DocumentDetail 
-          source={selectedDocument.source}
+          chunkId={selectedDocument.id.toString()}
           title={selectedDocument.title}
           onClose={() => setSelectedDocument(null)}
         />
