@@ -49,10 +49,10 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Chunk Details</h2>
+            <h2 className="text-xl font-semibold text-foreground">Chunk Details</h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -65,10 +65,10 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
 
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Chunk Details</h2>
+            <h2 className="text-xl font-semibold text-foreground">Chunk Details</h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -83,11 +83,11 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold">{title}</h2>
+            <h2 className="text-xl font-semibold text-foreground">{title}</h2>
             {source !== title && (
               <p className="text-sm text-muted-foreground">{source}</p>
             )}
@@ -110,7 +110,7 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
             <div className="border-t border-muted-foreground/20 pt-3">
               <div className="flex flex-wrap gap-2">
                 {Object.entries(documentDetail.chunks[0].metadata).map(([key, value]) => (
-                  <span key={key} className="text-xs bg-white border px-2 py-1 rounded">
+                  <span key={key} className="text-xs bg-background border px-2 py-1 rounded">
                     <strong>{key}:</strong> {
                       typeof value === 'object' && value !== null 
                         ? JSON.stringify(value)
@@ -124,10 +124,10 @@ export function DocumentDetail({ source, title, onClose }: DocumentDetailProps) 
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          <h3 className="font-medium sticky top-0 bg-white py-2">Content</h3>
+          <h3 className="font-medium sticky top-0 bg-background py-2 text-foreground">Content</h3>
           {documentDetail?.chunks.map((chunk) => (
             <div key={chunk.id} className="border rounded-lg p-4">
-              <div className="text-sm leading-relaxed prose prose-sm max-w-none">
+              <div className="text-sm leading-relaxed prose prose-sm prose-slate dark:prose-invert max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {chunk.content}
                 </ReactMarkdown>
