@@ -30,7 +30,7 @@ export function DocumentManagement() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 5,
     total: 0,
     pages: 0
   })

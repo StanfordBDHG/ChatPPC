@@ -60,7 +60,7 @@ export function Conversations({ stats }: ConversationsProps) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 5,
     total: 0,
     pages: 0
   })
