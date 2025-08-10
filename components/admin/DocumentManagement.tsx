@@ -67,7 +67,7 @@ export function DocumentManagement() {
     <div className="space-y-6">
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Document Management</h3>
+          <h3 className="text-lg font-semibold text-foreground">Document Management</h3>
         </div>
         
         {loading && !documentStats && (
@@ -92,8 +92,8 @@ export function DocumentManagement() {
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-medium">Chunks</h4>
-                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                      <h4 className="font-medium text-foreground">Chunks</h4>
+                      <span className="bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded-full">
                         {pagination.total}
                       </span>
                     </div>
@@ -102,7 +102,7 @@ export function DocumentManagement() {
                       <select 
                         value={pagination.limit}
                         onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                        className="border border-gray-300 rounded px-2 py-1 text-sm bg-white min-w-[60px]"
+                        className="border border-input rounded px-2 py-1 text-sm bg-background min-w-[60px]"
                         disabled={loading}
                       >
                         {PAGE_SIZE_OPTIONS.map(size => (
@@ -127,13 +127,13 @@ export function DocumentManagement() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <h5 className="font-medium mb-1">{doc.title}</h5>
+                          <h5 className="font-medium mb-1 text-foreground">{doc.title}</h5>
                           {doc.source !== doc.title && (
                             <p className="text-sm text-muted-foreground mb-2">{doc.source}</p>
                           )}
                           <p className="text-sm text-muted-foreground mt-2">{doc.content}</p>
                         </div>
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-4">
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded ml-4">
                           ID: {doc.id}
                         </span>
                       </div>

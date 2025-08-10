@@ -171,8 +171,8 @@ export function Conversations({ stats }: ConversationsProps) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card) => (
           <div key={card.title} className="rounded-lg border bg-card p-6">
-            <h3 className="text-lg font-semibold">{card.title}</h3>
-            <p className="text-2xl font-bold mt-2">{card.value}</p>
+            <h3 className="text-lg font-semibold text-foreground">{card.title}</h3>
+            <p className="text-2xl font-bold mt-2 text-foreground">{card.value}</p>
             <p className="text-sm text-muted-foreground">{card.description}</p>
           </div>
         ))}
@@ -180,7 +180,7 @@ export function Conversations({ stats }: ConversationsProps) {
       
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Recent Conversations</h3>
+          <h3 className="text-lg font-semibold text-foreground">Recent Conversations</h3>
         </div>
         
         <div className="flex items-center justify-between mb-4">
@@ -200,7 +200,7 @@ export function Conversations({ stats }: ConversationsProps) {
                       handleSearchSubmit()
                     }
                   }}
-                  className="w-64 pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-64 pl-10 pr-10 py-2 border border-input rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   disabled={loading}
                 />
                 {searchQuery && (
@@ -243,7 +243,7 @@ export function Conversations({ stats }: ConversationsProps) {
               <select 
                 value={pagination.limit}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="border border-gray-300 rounded px-2 py-1 text-sm bg-white min-w-[60px]"
+                className="border border-input rounded px-2 py-1 text-sm bg-background min-w-[60px]"
                 disabled={loading}
               >
                 {PAGE_SIZE_OPTIONS.map(size => (
@@ -282,18 +282,18 @@ export function Conversations({ stats }: ConversationsProps) {
                   onClick={() => setSelectedConversationId(conversation.id)}
                 >
                   <div className="flex-1">
-                    <p className="font-medium">Session {conversation.id.slice(0, 8)}</p>
+                    <p className="font-medium text-foreground">Session {conversation.id.slice(0, 8)}</p>
                     <p className="text-sm text-muted-foreground mb-1">
                       {conversation.message_count} messages • Created: {formatDate(conversation.created_at)} • Last Updated: {formatDate(conversation.updated_at)}
                     </p>
                     {conversation.first_message && (
-                      <p className="text-sm text-gray-600 italic">
+                      <p className="text-sm text-muted-foreground italic">
                         &ldquo;{conversation.first_message.content}&rdquo;
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
                       Click to view
                     </span>
                   </div>
@@ -343,7 +343,7 @@ export function Conversations({ stats }: ConversationsProps) {
 
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Most Clicked Links</h3>
+          <h3 className="text-lg font-semibold text-foreground">Most Clicked Links</h3>
         </div>
         
         <div className="flex items-center justify-between mb-4">
@@ -363,7 +363,7 @@ export function Conversations({ stats }: ConversationsProps) {
                       handleLinkSearchSubmit()
                     }
                   }}
-                  className="w-64 pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-64 pl-10 pr-10 py-2 border border-input rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   disabled={linkClicksLoading}
                 />
                 {linkSearchQuery && (
@@ -406,7 +406,7 @@ export function Conversations({ stats }: ConversationsProps) {
               <select 
                 value={linkClicksPagination.limit}
                 onChange={(e) => handleLinkClicksPageSizeChange(Number(e.target.value))}
-                className="border border-gray-300 rounded px-2 py-1 text-sm bg-white min-w-[60px]"
+                className="border border-input rounded px-2 py-1 text-sm bg-background min-w-[60px]"
                 disabled={linkClicksLoading}
               >
                 {PAGE_SIZE_OPTIONS.map(size => (
@@ -450,7 +450,7 @@ export function Conversations({ stats }: ConversationsProps) {
                           href={link.url} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                          className="text-primary hover:text-primary/80 font-medium flex items-center gap-1"
                         >
                           {link.text}
                           <ExternalLink className="h-3 w-3 flex-shrink-0" />

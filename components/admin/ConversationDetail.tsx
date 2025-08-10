@@ -54,10 +54,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Conversation Details</h2>
+            <h2 className="text-xl font-semibold text-foreground">Conversation Details</h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -70,10 +70,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Conversation Details</h2>
+            <h2 className="text-xl font-semibold text-foreground">Conversation Details</h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -88,11 +88,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold">Session {conversationDetail?.session.id.slice(0, 8)}</h2>
+            <h2 className="text-xl font-semibold text-foreground">Session {conversationDetail?.session.id.slice(0, 8)}</h2>
             <p className="text-sm text-muted-foreground">
               Started: {conversationDetail && formatDate(conversationDetail.session.created_at)}
             </p>
@@ -114,22 +114,22 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          <h3 className="font-medium sticky top-0 bg-white py-2">Messages</h3>
+          <h3 className="font-medium sticky top-0 bg-background py-2 text-foreground">Messages</h3>
           {conversationDetail?.messages.map((message) => (
             <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`flex gap-3 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                   message.role === 'user' 
-                    ? 'bg-blue-100 text-blue-600' 
-                    : 'bg-gray-100 text-gray-600'
+                    ? 'bg-primary/10 text-primary' 
+                    : 'bg-muted text-muted-foreground'
                 }`}>
                   {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                 </div>
                 
                 <div className={`rounded-lg p-3 ${
                   message.role === 'user' 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-secondary text-secondary-foreground' 
+                    : 'bg-secondary text-secondary-foreground'
                 }`}>
                   <div className="text-sm leading-relaxed whitespace-pre-wrap">
                     {message.content}
@@ -144,7 +144,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                     </details>
                   )}
                   
-                  <div className={`text-xs mt-2 opacity-75 ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
+                  <div className={`text-xs mt-2 opacity-75 ${message.role === 'user' ? 'text-secondary-foreground' : 'text-secondary-foreground'}`}>
                     {formatDate(message.created_at)}
                   </div>
                 </div>

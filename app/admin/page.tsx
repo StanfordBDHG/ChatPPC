@@ -57,7 +57,7 @@ export default function AdminDashboard() {
 
   const renderHeader = (subtitle?: string) => (
     <div>
-      <h2 className="text-2xl font-bold">ChatPPC Admin Dashboard</h2>
+      <h2 className="text-2xl font-bold text-foreground">ChatPPC Admin Dashboard</h2>
       {subtitle && (
         <p className={subtitle?.startsWith('Error:') ? 'text-destructive' : 'text-muted-foreground'}>
           {subtitle}
