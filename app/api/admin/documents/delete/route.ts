@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { withAdminAuth } from "@/lib/adminAuth";
 
-export async function DELETE(req: NextRequest) {
+async function handleDeleteDocument(req: NextRequest, _user: any) {
   try {
     const body = await req.json();
     const { source } = body;
@@ -56,7 +57,7 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-export async function GET() {
+async function handleGetDocumentSources(req: NextRequest, _user: any) {
   try {
     const client = createClient(
       process.env.SUPABASE_URL!,
@@ -94,3 +95,6 @@ export async function GET() {
     );
   }
 }
+
+export const DELETE = withAdminAuth(handleDeleteDocument);
+export const GET = withAdminAuth(handleGetDocumentSources);

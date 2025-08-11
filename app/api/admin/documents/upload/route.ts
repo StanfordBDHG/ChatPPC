@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { createHash } from 'crypto';
+import { withAdminAuth } from "@/lib/adminAuth";
 
 function getDocumentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
@@ -28,7 +29,7 @@ async function getExistingDocumentHash(client: any, source: string): Promise<str
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handleUploadDocuments(req: NextRequest, _user: any) {
   try {
     const formData = await req.formData();
     const files = formData.getAll('files') as File[];
@@ -141,3 +142,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withAdminAuth(handleUploadDocuments);
