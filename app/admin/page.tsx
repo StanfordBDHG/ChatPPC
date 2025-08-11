@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Conversations } from '@/components/admin/Conversations'
 import { DocumentManagement } from '@/components/admin/DocumentManagement'
 import { BarChart3, FileText, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
+import { fetchWithAuth } from '@/lib/adminUtils'
 
 interface Stats {
   totalConversations: number
@@ -22,23 +22,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchWithAuth = async (url: string) => {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) throw new Error('Not authenticated')
-
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`${response.status} - ${errorText}`)
-    }
-    
-    return response.json()
-  }
 
   const fetchData = useCallback(async () => {
     try {
