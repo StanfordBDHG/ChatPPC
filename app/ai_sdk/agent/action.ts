@@ -17,7 +17,7 @@ export async function runAgent(input: string) {
       "hwchase17/openai-tools-agent",
     );
 
-    const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
+    const llm = new ChatOpenAI({ model: "gpt-5-mini" });
 
     const agent = createToolCallingAgent({
       llm,
