@@ -80,7 +80,7 @@ export function NavbarAuth() {
       size="default"
       onClick={handleSignIn}
     >
-      Admin Login
+      📄
     </Button>
   )
 }
