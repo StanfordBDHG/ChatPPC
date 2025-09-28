@@ -111,6 +111,8 @@ export async function POST(req: NextRequest) {
     });
 
     const retriever = vectorstore.asRetriever({
+      k: 5, // Limit to top 5 most relevant documents
+      searchType: "similarity",
       callbacks: [
         {
           handleRetrieverEnd(documents) {

@@ -37,6 +37,10 @@ next-env.d.ts
 .branches
 .temp
 
+# temporary files
+temp-*.sql
+*-local.sql
+
 .yarn/*
 !.yarn/patches
 !.yarn/plugins

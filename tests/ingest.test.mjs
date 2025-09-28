@@ -4,12 +4,12 @@ import { writeFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import { 
-  getDocumentHash, 
-  getExistingDocumentHash, 
-  getMarkdownFiles, 
-  readMarkdownFile 
-} from './ingest.mjs';
+import {
+  getDocumentHash,
+  getExistingDocumentHash,
+  getMarkdownFiles,
+  readMarkdownFile
+} from '../scripts/ingest.mjs';
 
 config({ path: join(process.cwd(), '.env.local') });
 
