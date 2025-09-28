@@ -96,6 +96,39 @@ The script will:
 - Generate embeddings using OpenAI
 - Store the embeddings in your Supabase vector database
 
+## Vector Search Optimization
+
+For optimal performance with vector similarity search, you should create proper database indexes after ingesting documents. The project includes two SQL scripts to help with this:
+
+### Setting Up Vector Indexes
+
+After running document ingestion, execute the optimization script to create HNSW and GIN indexes:
+
+1. Open your Supabase project dashboard
+2. Navigate to the SQL Editor
+3. Copy and paste the contents of `supabase/optimize-vector-search.sql`
+4. Execute the script
+
+This script creates:
+- **HNSW index** on embeddings for fast vector similarity search
+- **GIN index** on metadata for efficient filtering
+
+### Verifying Index Performance
+
+To confirm your indexes are working correctly:
+
+1. In the SQL Editor, run the contents of `supabase/verify-indexes.sql`
+2. This will show index status, test performance, and display usage statistics
+
+### When to Run These Scripts
+
+- **Always run** after initial document ingestion
+- **Re-run** whenever you recreate the `documents` table
+- **Monitor** periodically if you notice slow search performance
+
+> [!TIP]
+> The HNSW index significantly improves vector search performance but requires documents to exist before creation. Always ingest documents first, then create indexes.
+
 ## Admin Dashboard
 
 To access the admin dashboard for viewing conversation analytics and managing documents:
