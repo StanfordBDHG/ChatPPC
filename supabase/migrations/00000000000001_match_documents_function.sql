@@ -16,14 +16,27 @@ AS $$
 BEGIN
     RETURN QUERY
     SELECT
-        id,
-        content,
-        metadata,
-        (embedding::text)::jsonb as embedding,
-        1 - (documents.embedding <=> query_embedding) as similarity
-    FROM documents
-    WHERE metadata @> filter
-    ORDER BY documents.embedding <=> query_embedding
+        d.id,
+        d.content,
+        d.metadata,
+        (d.embedding::text)::jsonb as embedding,
+        1 - d.distance as similarity
+    FROM (
+        SELECT
+            id,
+            content,
+            metadata,
+            embedding,
+            embedding <=> query_embedding as distance
+        FROM documents
+        ORDER BY embedding <=> query_embedding
+        LIMIT CASE
+            WHEN filter = '{}' THEN match_count
+            ELSE match_count * 2  -- Get more candidates when filtering
+        END
+    ) d
+    WHERE d.metadata @> filter
+    ORDER BY d.distance
     LIMIT match_count;
 END;
 $$; 
