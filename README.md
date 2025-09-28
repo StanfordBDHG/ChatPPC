@@ -98,7 +98,7 @@ The script will:
 
 ## Vector Search Optimization
 
-For optimal performance with vector similarity search, you should create proper database indexes after ingesting documents. The project includes two SQL scripts to help with this:
+The project includes optimized vector search functionality with robust error handling and performance enhancements. For optimal performance, you should also create proper database indexes after ingesting documents.
 
 ### Setting Up Vector Indexes
 
