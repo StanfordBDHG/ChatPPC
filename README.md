@@ -13,8 +13,9 @@ ChatPPC is a tool to help staff at [Gardner Packard Children's Health Center](ht
 
 ### Prerequisites
 
-- Node.js 22+ 
-- OpenAI API key
+- Node.js 18+
+- Docker Desktop (for local Supabase development)
+- OpenAI API key (for document ingestion and embeddings)
 
 ### Setup for Development
 
@@ -64,9 +65,6 @@ SUPABASE_PRIVATE_KEY={service_role key}
 supabase migration up
 ```
 
-> [!TIP]
-> At this step, you can follow the instructions below in the *Document Ingestion* section if you wish to add documents to test with.
-
 8. Run the development server:
 ```bash
 yarn run dev
@@ -74,6 +72,54 @@ yarn run dev
 
 9. Open [http://localhost:3000](http://localhost:3000) to view the ChatPPC application. You can also access the Supabase Studio at [http://localhost:54323](http://localhost:54323) to view and manage your local database.
 
+> [!TIP]
+> At this point, you can follow the instructions below in the *Document Ingestion* and *Vector Search Optimization* sections to add documents and optimize search performance.
+
+## Testing
+
+The project includes a comprehensive test suite covering document ingestion, vector search optimization, and end-to-end workflows:
+
+### Running Tests
+
+```bash
+# Run all tests (unit + integration)
+yarn test
+
+# Run only unit tests (fast, no database required)
+yarn test:unit
+
+# Run integration tests (requires Supabase setup)
+yarn test:integration
+
+# Run complete test suite including app tests
+yarn test:all
+```
+
+### Test Categories
+
+#### Unit Tests
+- **Ingestion Tests** (`yarn test:ingest`): Document processing, hash generation, file handling
+- **Optimization Tests** (`yarn test:optimize`): Vector index setup, SQL validation, script functionality
+
+#### Integration Tests
+- **End-to-End Workflow** (`yarn test:integration`): Complete document ingestion → optimization → search workflow
+- **Database Integration**: Real Supabase database operations and vector search performance
+- **Function Validation**: Tests the `match_documents` function with various parameters
+
+### Test Requirements
+
+- **Unit tests**: No external dependencies (always runnable)
+- **Integration tests**: Require `SUPABASE_URL` and `SUPABASE_PRIVATE_KEY` environment variables
+- **All tests**: Node.js 18+ and project dependencies installed
+
+## Quick Start Workflow
+
+Once you have the development environment set up, follow this workflow:
+
+1. **Ingest Documents**: `yarn ingest docs` (add your `.md` files to the `docs` folder first)
+2. **Optimize Search**: `yarn optimize` (creates database indexes for better performance)
+3. **Test Everything**: `yarn test` (runs comprehensive test suite)
+4. **Start Development**: `yarn dev` (application ready at http://localhost:3000)
 
 ## Document Ingestion
 
@@ -98,25 +144,42 @@ The script will:
 
 ## Vector Search Optimization
 
-The project includes optimized vector search functionality with robust error handling and performance enhancements. For optimal performance, you should also create proper database indexes after ingesting documents.
+The project includes optimized vector search functionality with robust error handling and performance enhancements. The application will work without these optimizations, but creating proper database indexes after ingesting documents significantly improves search performance.
 
 ### Setting Up Vector Indexes
 
-After running document ingestion, execute the optimization script to create HNSW and GIN indexes:
+After running document ingestion, you can create HNSW and GIN indexes using either method:
 
+#### Option 1: Automated Script (Recommended)
+```bash
+yarn optimize
+```
+
+This automatically:
+- Detects your Supabase environment (local/remote)
+- Runs the optimization SQL script
+- Verifies the indexes were created successfully
+
+#### Option 2: Manual SQL Execution
 1. Open your Supabase project dashboard
 2. Navigate to the SQL Editor
 3. Copy and paste the contents of `supabase/optimize-vector-search.sql`
 4. Execute the script
 
-This script creates:
+Both methods create:
 - **HNSW index** on embeddings for fast vector similarity search
 - **GIN index** on metadata for efficient filtering
 
 ### Verifying Index Performance
 
-To confirm your indexes are working correctly:
+The automated script includes verification by default. To run verification manually:
 
+**Option 1: Included with optimization**
+```bash
+yarn optimize  # Includes verification automatically
+```
+
+**Option 2: Manual verification**
 1. In the SQL Editor, run the contents of `supabase/verify-indexes.sql`
 2. This will show index status, test performance, and display usage statistics
 
@@ -128,6 +191,9 @@ To confirm your indexes are working correctly:
 
 > [!TIP]
 > The HNSW index significantly improves vector search performance but requires documents to exist before creation. Always ingest documents first, then create indexes.
+
+> [!NOTE]
+> The application functions without these optimizations, but indexes become essential for good performance with larger document collections (1,000+ documents).
 
 ## Admin Dashboard
 
