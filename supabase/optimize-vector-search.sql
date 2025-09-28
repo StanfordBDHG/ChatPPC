@@ -27,7 +27,7 @@ SELECT
     indexname,
     indexdef
 FROM pg_indexes
-WHERE tablename = 'documents'
+WHERE schemaname = 'public' AND tablename = 'documents'
 ORDER BY indexname;
 
 -- Create HNSW vector index
@@ -51,5 +51,5 @@ SELECT
         ELSE 'Other index'
     END as purpose
 FROM pg_indexes
-WHERE tablename = 'documents'
+WHERE schemaname = 'public' AND tablename = 'documents'
 ORDER BY indexname;
