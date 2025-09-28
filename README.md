@@ -75,6 +75,27 @@ yarn run dev
 > [!TIP]
 > At this point, you can follow the instructions below in the *Document Ingestion* and *Vector Search Optimization* sections to add documents and optimize search performance.
 
+## Project Structure
+
+```
+├── scripts/                   # Executable Node.js scripts
+│   ├── ingest.mjs             # Document ingestion script
+│   └── optimize.mjs           # Vector search optimization script
+├── tests/                     # All test files
+│   ├── ingest.test.mjs        # Ingestion functionality tests
+│   ├── optimize.test.mjs      # Optimization script tests
+│   └── database.test.mjs      # Database connectivity tests
+├── supabase/                  # Database-related files
+│   ├── migrations/            # Database schema changes
+│   ├── scripts/               # SQL utility scripts
+│   │   ├── optimize-vector-search.sql
+│   │   └── verify-indexes.sql
+│   └── seed.sql              # Initial data seeding
+├── app/                      # Next.js application pages
+├── components/               # React components
+└── docs/                     # Documentation files for ingestion
+```
+
 ## Testing
 
 The project includes a comprehensive test suite covering document ingestion, vector search optimization, and end-to-end workflows:
@@ -82,14 +103,14 @@ The project includes a comprehensive test suite covering document ingestion, vec
 ### Running Tests
 
 ```bash
-# Run all tests (unit + integration)
+# Run all tests (unit + database)
 yarn test
 
 # Run only unit tests (fast, no database required)
 yarn test:unit
 
-# Run integration tests (requires Supabase setup)
-yarn test:integration
+# Run database tests (requires Supabase setup)
+yarn test:database
 
 # Run complete test suite including app tests
 yarn test:all
@@ -101,15 +122,15 @@ yarn test:all
 - **Ingestion Tests** (`yarn test:ingest`): Document processing, hash generation, file handling
 - **Optimization Tests** (`yarn test:optimize`): Vector index setup, SQL validation, script functionality
 
-#### Integration Tests
-- **End-to-End Workflow** (`yarn test:integration`): Complete document ingestion → optimization → search workflow
-- **Database Integration**: Real Supabase database operations and vector search performance
+#### Database Tests
+- **Database Connectivity** (`yarn test:database`): Supabase connection and vector search functionality
 - **Function Validation**: Tests the `match_documents` function with various parameters
+- **Performance Testing**: Vector search speed and result accuracy
 
 ### Test Requirements
 
 - **Unit tests**: No external dependencies (always runnable)
-- **Integration tests**: Require `SUPABASE_URL` and `SUPABASE_PRIVATE_KEY` environment variables
+- **Database tests**: Require `SUPABASE_URL` and `SUPABASE_PRIVATE_KEY` environment variables
 - **All tests**: Node.js 18+ and project dependencies installed
 
 ## Quick Start Workflow
@@ -117,7 +138,7 @@ yarn test:all
 Once you have the development environment set up, follow this workflow:
 
 1. **Ingest Documents**: `yarn ingest docs` (add your `.md` files to the `docs` folder first)
-2. **Optimize Search**: `yarn optimize` (creates database indexes for better performance)
+2. **Optimize Search (optional)**: `yarn optimize` (creates database indexes for better performance with larger numbers of documents)
 3. **Test Everything**: `yarn test` (runs comprehensive test suite)
 4. **Start Development**: `yarn dev` (application ready at http://localhost:3000)
 
@@ -144,61 +165,22 @@ The script will:
 
 ## Vector Search Optimization
 
-The project includes optimized vector search functionality with robust error handling and performance enhancements. The application will work without these optimizations, but creating proper database indexes after ingesting documents significantly improves search performance.
+> [!NOTE]
+> This section describes *optional* optimization techniques that may be helpful if encountering slow queries when ingesting larger numbers of documents.
 
-### Setting Up Vector Indexes
+After running document ingestion, you can create vector indexes by running the following script:
 
-After running document ingestion, you can create HNSW and GIN indexes using either method:
-
-#### Option 1: Automated Script (Recommended)
 ```bash
 yarn optimize
 ```
 
-This automatically:
-- Detects your Supabase environment (local/remote)
-- Runs the optimization SQL script
-- Verifies the indexes were created successfully
-
-#### Option 2: Manual SQL Execution
-1. Open your Supabase project dashboard
-2. Navigate to the SQL Editor
-3. Copy and paste the contents of `supabase/optimize-vector-search.sql`
-4. Execute the script
-
-Both methods create:
+This script will create and verify:
 - **HNSW index** on embeddings for fast vector similarity search
 - **GIN index** on metadata for efficient filtering
-
-### Verifying Index Performance
-
-The automated script includes verification by default. To run verification manually:
-
-**Option 1: Included with optimization**
-```bash
-yarn optimize  # Includes verification automatically
-```
-
-**Option 2: Manual verification**
-1. In the SQL Editor, run the contents of `supabase/verify-indexes.sql`
-2. This will show index status, test performance, and display usage statistics
-
-### When to Run These Scripts
-
-- **Always run** after initial document ingestion
-- **Re-run** whenever you recreate the `documents` table
-- **Monitor** periodically if you notice slow search performance
-
-> [!TIP]
-> The HNSW index significantly improves vector search performance but requires documents to exist before creation. Always ingest documents first, then create indexes.
-
-> [!NOTE]
-> The application functions without these optimizations, but indexes become essential for good performance with larger document collections (1,000+ documents).
 
 ## Admin Dashboard
 
 To access the admin dashboard for viewing conversation analytics and managing documents:
 
 1. Navigate to the Supabase dashboard and add a new user under `Authentication` with an email and password. Currently only admins have individual user accounts, whereas users access without an account, therefore *any user created in Supabase Authentication is automatically considered an admin*.
-2. Navigate to `/admin` or click the `Admin Login` button in the navbar.
-3. Sign in with admin credentials.
+2. Navigate to `/admin` or click the 📄 icon in the top right of the navbar, then sign in with your admin credentials.
