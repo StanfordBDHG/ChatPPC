@@ -524,6 +524,10 @@ export function Conversations({ stats }: ConversationsProps) {
         <ConversationDetail 
           conversationId={selectedConversationId}
           onClose={() => setSelectedConversationId(null)}
+          onDeleted={() => {
+            setSelectedConversationId(null)
+            fetchConversations()
+          }}
         />
       )}
     </div>

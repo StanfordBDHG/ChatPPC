@@ -53,4 +53,50 @@ async function handleGetConversation(req: NextRequest, _user: any, { params }: {
   });
 }
 
+async function handleDeleteConversation(req: NextRequest, _user: any, { params }: { params: Promise<{ id: string }> }) {
+  const { id: conversationId } = await params;
+  
+  const client = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_PRIVATE_KEY!,
+  );
+  
+  // First check if the conversation exists
+  const { data: session, error: sessionError } = await client
+    .from('chat_sessions')
+    .select('id')
+    .eq('id', conversationId)
+    .single();
+  
+  if (sessionError || !session) {
+    return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+  }
+  
+  // Delete all messages for this conversation first
+  const { error: messagesError } = await client
+    .from('chat_messages')
+    .delete()
+    .eq('session_id', conversationId);
+  
+  if (messagesError) {
+    return NextResponse.json({ error: messagesError.message }, { status: 500 });
+  }
+  
+  // Then delete the conversation session
+  const { error: deleteError } = await client
+    .from('chat_sessions')
+    .delete()
+    .eq('id', conversationId);
+  
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+  
+  return NextResponse.json({ 
+    success: true, 
+    message: `Successfully deleted conversation ${conversationId}`
+  });
+}
+
 export const GET = withAdminAuth(handleGetConversation);
+export const DELETE = withAdminAuth(handleDeleteConversation);
