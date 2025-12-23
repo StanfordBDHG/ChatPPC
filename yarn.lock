@@ -5076,7 +5076,7 @@ __metadata:
     dotenv: ^16.4.7
     eslint: 8.46.0
     eslint-config-next: 13.4.12
-    langchain: ^0.3.11
+    langchain: ^0.3.37
     lucide-react: ^0.473.0
     next: ^15.4.7
     next-themes: ^0.4.4
@@ -5103,7 +5103,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"langchain@npm:>=0.2.3 <0.3.0 || >=0.3.4 <0.4.0, langchain@npm:^0.3.11":
+"langchain@npm:>=0.2.3 <0.3.0 || >=0.3.4 <0.4.0":
   version: 0.3.30
   resolution: "langchain@npm:0.3.30"
   dependencies:
@@ -5176,6 +5176,79 @@ __metadata:
   languageName: node
   linkType: hard
 
+"langchain@npm:^0.3.37":
+  version: 0.3.37
+  resolution: "langchain@npm:0.3.37"
+  dependencies:
+    "@langchain/openai": ">=0.1.0 <0.7.0"
+    "@langchain/textsplitters": ">=0.0.0 <0.2.0"
+    js-tiktoken: ^1.0.12
+    js-yaml: ^4.1.0
+    jsonpointer: ^5.0.1
+    langsmith: ^0.3.67
+    openapi-types: ^12.1.3
+    p-retry: 4
+    uuid: ^10.0.0
+    yaml: ^2.2.1
+    zod: ^3.25.32
+  peerDependencies:
+    "@langchain/anthropic": "*"
+    "@langchain/aws": "*"
+    "@langchain/cerebras": "*"
+    "@langchain/cohere": "*"
+    "@langchain/core": ">=0.3.58 <0.4.0"
+    "@langchain/deepseek": "*"
+    "@langchain/google-genai": "*"
+    "@langchain/google-vertexai": "*"
+    "@langchain/google-vertexai-web": "*"
+    "@langchain/groq": "*"
+    "@langchain/mistralai": "*"
+    "@langchain/ollama": "*"
+    "@langchain/xai": "*"
+    axios: "*"
+    cheerio: "*"
+    handlebars: ^4.7.8
+    peggy: ^3.0.2
+    typeorm: "*"
+  peerDependenciesMeta:
+    "@langchain/anthropic":
+      optional: true
+    "@langchain/aws":
+      optional: true
+    "@langchain/cerebras":
+      optional: true
+    "@langchain/cohere":
+      optional: true
+    "@langchain/deepseek":
+      optional: true
+    "@langchain/google-genai":
+      optional: true
+    "@langchain/google-vertexai":
+      optional: true
+    "@langchain/google-vertexai-web":
+      optional: true
+    "@langchain/groq":
+      optional: true
+    "@langchain/mistralai":
+      optional: true
+    "@langchain/ollama":
+      optional: true
+    "@langchain/xai":
+      optional: true
+    axios:
+      optional: true
+    cheerio:
+      optional: true
+    handlebars:
+      optional: true
+    peggy:
+      optional: true
+    typeorm:
+      optional: true
+  checksum: 08584ba7dc5c7340bf7db6110957bcc8b934ef3b8ed7aceabd77a9bf25796defe5d4945c55e15ce8d6a405ab8d278563a0fb7e0e70e7e24ab00e598bcae8fa35
+  languageName: node
+  linkType: hard
+
 "langsmith@npm:^0.3.33, langsmith@npm:^0.3.46":
   version: 0.3.56
   resolution: "langsmith@npm:0.3.56"
@@ -5202,6 +5275,34 @@ __metadata:
     openai:
       optional: true
   checksum: d200b95889b2a34a63db72e83a442bb10a8c87a304ef39f37edc5b13e4e234ae208ffa93bd0d6e4004f42096397ca48742367d0f58150238380a97dcdedf1fc6
+  languageName: node
+  linkType: hard
+
+"langsmith@npm:^0.3.67":
+  version: 0.3.87
+  resolution: "langsmith@npm:0.3.87"
+  dependencies:
+    "@types/uuid": ^10.0.0
+    chalk: ^4.1.2
+    console-table-printer: ^2.12.1
+    p-queue: ^6.6.2
+    semver: ^7.6.3
+    uuid: ^10.0.0
+  peerDependencies:
+    "@opentelemetry/api": "*"
+    "@opentelemetry/exporter-trace-otlp-proto": "*"
+    "@opentelemetry/sdk-trace-base": "*"
+    openai: "*"
+  peerDependenciesMeta:
+    "@opentelemetry/api":
+      optional: true
+    "@opentelemetry/exporter-trace-otlp-proto":
+      optional: true
+    "@opentelemetry/sdk-trace-base":
+      optional: true
+    openai:
+      optional: true
+  checksum: 30b9b076199c4201ab475440e9887da58884d4c10e0cbcee554c7cffe0c42d9169224452904400d8e6c441d715217c479865fca484d4624c30160f4df6e4b6c8
   languageName: node
   linkType: hard
 
