@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@langchain/community": "^0.3.25",
-    "@langchain/core": "^0.3.31",
+    "@langchain/core": "^0.3.80",
     "@langchain/langgraph": "^0.2.41",
     "@langchain/openai": "^0.3.17",
     "@radix-ui/react-checkbox": "^1.1.3",
