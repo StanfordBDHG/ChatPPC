@@ -1,0 +1,54 @@
+name: Crawl PPC Website
+
+on:
+  # Weekly on Sundays at 6:00 AM UTC
+  schedule:
+    - cron: "0 6 * * 0"
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: "Max pages to crawl (leave empty for unlimited)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (no database writes)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run PPC crawler
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PRIVATE_KEY: ${{ secrets.SUPABASE_PRIVATE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ -n "${{ inputs.max_pages }}" ]; then
+            ARGS="$ARGS --max-pages ${{ inputs.max_pages }}"
+          fi
+          node scripts/crawl-ppc.mjs $ARGS

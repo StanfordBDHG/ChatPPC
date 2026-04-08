@@ -18,7 +18,10 @@
     "test:all": "yarn test:unit && yarn test:database && yarn test:app",
     "ingest": "node scripts/ingest.mjs",
     "optimize": "node scripts/optimize.mjs",
-    "optimize:verify": "node scripts/optimize.mjs --skip-verify"
+    "optimize:verify": "node scripts/optimize.mjs --skip-verify",
+    "crawl": "node scripts/crawl-ppc.mjs",
+    "crawl:dry": "node scripts/crawl-ppc.mjs --dry-run",
+    "crawl:test": "node scripts/crawl-ppc.mjs --dry-run --max-pages 5"
   },
   "engines": {
     "node": ">=18"
@@ -71,6 +74,7 @@
     "eslint-config-next": "13.4.12",
     "postcss": "8.4.31",
     "prettier": "^3.4.2",
+    "playwright": "^1.50.0",
     "supabase": "latest",
     "tailwindcss": "3.3.3",
     "typescript": "5.1.6"
