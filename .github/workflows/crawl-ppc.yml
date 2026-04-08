@@ -35,8 +35,8 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+      - name: Install Playwright
+        run: yarn add --dev playwright && npx playwright install chromium --with-deps
 
       - name: Run PPC crawler
         env:
