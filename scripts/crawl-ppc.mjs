@@ -176,17 +176,59 @@ async function extractResources(page) {
       )
       .forEach((el) => el.remove());
 
-    // Helper: walk up the DOM from an element to find the nearest heading
-    function findNearestHeading(el) {
-      // First check previous siblings and their children
+    // Helper: find the full heading breadcrumb path for an element.
+    // Returns something like "Health Supervision > Sports" by collecting
+    // all headings (h1–h6) that precede this element at increasing levels.
+    function findHeadingPath(el) {
+      const headings = []; // [ { level, text } ]
+
+      // Walk backwards through the document to find preceding headings
       let node = el;
-      while (node) {
+      while (node && node !== clone) {
+        let prev = node.previousElementSibling;
+        while (prev) {
+          if (/^H[1-6]$/.test(prev.tagName)) {
+            const level = parseInt(prev.tagName[1], 10);
+            const text = prev.textContent.trim();
+            // Only add if it's a higher level than what we already have,
+            // or if we don't have any headings yet
+            if (
+              text &&
+              (headings.length === 0 || level < headings[0].level)
+            ) {
+              headings.unshift({ level, text });
+            }
+          }
+          // Also check headings inside the previous sibling
+          const innerHeadings = prev.querySelectorAll("h1, h2, h3, h4, h5, h6");
+          for (let i = innerHeadings.length - 1; i >= 0; i--) {
+            const h = innerHeadings[i];
+            const level = parseInt(h.tagName[1], 10);
+            const text = h.textContent.trim();
+            if (
+              text &&
+              (headings.length === 0 || level < headings[0].level)
+            ) {
+              headings.unshift({ level, text });
+            }
+          }
+          prev = prev.previousElementSibling;
+        }
+        node = node.parentElement;
+      }
+
+      return headings.map((h) => h.text).join(" > ");
+    }
+
+    // Helper: find just the nearest (most specific) heading
+    function findNearestHeading(el) {
+      let node = el;
+      while (node && node !== clone) {
         let prev = node.previousElementSibling;
         while (prev) {
           if (/^H[1-6]$/.test(prev.tagName)) {
             return prev.textContent.trim();
           }
-          // Check last heading inside the previous sibling
           const headings = prev.querySelectorAll("h1, h2, h3, h4, h5, h6");
           if (headings.length > 0) {
             return headings[headings.length - 1].textContent.trim();
@@ -201,23 +243,60 @@ async function extractResources(page) {
       return "";
     }
 
-    // Helper: get the surrounding text context for a link
-    function getContext(el) {
-      // Walk up to the nearest block-level container
-      const blockTags = new Set([
-        "P", "LI", "DIV", "TD", "TH", "BLOCKQUOTE",
-        "SECTION", "ARTICLE", "DD", "DT", "FIGCAPTION",
-      ]);
-      let container = el.parentElement;
-      while (container && !blockTags.has(container.tagName)) {
-        container = container.parentElement;
+    // Helper: get the section-level context — all text between the nearest
+    // heading and the next heading at the same or higher level.
+    // This captures sibling resources and explanatory text in the section.
+    function getSectionContext(el) {
+      // Find the nearest heading element before this element
+      let headingEl = null;
+      let node = el;
+      outer: while (node && node !== clone) {
+        let prev = node.previousElementSibling;
+        while (prev) {
+          if (/^H[1-6]$/.test(prev.tagName)) {
+            headingEl = prev;
+            break outer;
+          }
+          const headings = prev.querySelectorAll("h1, h2, h3, h4, h5, h6");
+          if (headings.length > 0) {
+            headingEl = headings[headings.length - 1];
+            break outer;
+          }
+          prev = prev.previousElementSibling;
+        }
+        node = node.parentElement;
       }
-      if (!container) container = el.parentElement;
-      if (!container) return "";
 
-      // Get text content but limit length
-      const text = container.textContent.replace(/\s+/g, " ").trim();
-      return text.length > 500 ? text.substring(0, 500) + "..." : text;
+      if (!headingEl) {
+        // Fallback: get immediate container text
+        const container = el.closest("p, li, div, td, section") || el.parentElement;
+        const text = container ? container.textContent.replace(/\s+/g, " ").trim() : "";
+        return text.length > 800 ? text.substring(0, 800) + "..." : text;
+      }
+
+      // Collect text from the heading through subsequent siblings until
+      // we hit another heading of the same or higher level
+      const headingLevel = parseInt(headingEl.tagName[1], 10);
+      const parts = [headingEl.textContent.trim()];
+      let sibling = headingEl.nextElementSibling;
+      let charCount = parts[0].length;
+
+      while (sibling && charCount < 1200) {
+        if (/^H[1-6]$/.test(sibling.tagName)) {
+          const sibLevel = parseInt(sibling.tagName[1], 10);
+          if (sibLevel <= headingLevel) break; // next section starts
+          // Sub-heading: include it
+        }
+        const text = sibling.textContent.replace(/\s+/g, " ").trim();
+        if (text) {
+          parts.push(text);
+          charCount += text.length;
+        }
+        sibling = sibling.nextElementSibling;
+      }
+
+      const result = parts.join(" | ");
+      return result.length > 1200 ? result.substring(0, 1200) + "..." : result;
     }
 
     // --- Extract links ---
@@ -239,7 +318,8 @@ async function extractResources(page) {
       } else if (href.startsWith("mailto:") || href.startsWith("tel:")) {
         // Capture contact info
         const section = findNearestHeading(a);
-        const context = getContext(a);
+        const sectionPath = findHeadingPath(a);
+        const context = getSectionContext(a);
         const key = `contact:${href}:${section}`;
         if (!seen.has(key)) {
           seen.add(key);
@@ -247,6 +327,7 @@ async function extractResources(page) {
             resource_url: href,
             link_text: text,
             section,
+            section_path: sectionPath,
             context,
             resource_type: "contact",
           });
@@ -257,7 +338,8 @@ async function extractResources(page) {
       }
 
       const section = findNearestHeading(a);
-      const context = getContext(a);
+      const sectionPath = findHeadingPath(a);
+      const context = getSectionContext(a);
       const key = `${fullUrl}:${section}`;
 
       if (seen.has(key)) continue;
@@ -267,6 +349,7 @@ async function extractResources(page) {
         resource_url: fullUrl,
         link_text: text,
         section,
+        section_path: sectionPath,
         context,
         resource_type: "link",
       });
@@ -294,7 +377,8 @@ async function extractResources(page) {
         if (!inAnchor) {
           const container = node.parentElement;
           const section = findNearestHeading(container);
-          const context = getContext(container);
+          const sectionPath = findHeadingPath(container);
+          const context = getSectionContext(container);
           const phones = text.match(phoneRegex);
           for (const phone of phones) {
             const key = `phone:${phone}:${section}`;
@@ -304,6 +388,7 @@ async function extractResources(page) {
                 resource_url: `tel:${phone.replace(/[^\d+]/g, "")}`,
                 link_text: phone,
                 section,
+                section_path: sectionPath,
                 context,
                 resource_type: "contact",
               });
@@ -339,8 +424,10 @@ function buildDocumentContent(resource, pageTitle, pageUrl) {
     lines.push(`URL: ${resource.resource_url}`);
   }
 
-  // Section heading from the page
-  if (resource.section) {
+  // Full section path (e.g. "Health Supervision > Sports")
+  if (resource.section_path) {
+    lines.push(`Section: ${resource.section_path}`);
+  } else if (resource.section) {
     lines.push(`Topic: ${resource.section}`);
   }
 
@@ -348,7 +435,8 @@ function buildDocumentContent(resource, pageTitle, pageUrl) {
   lines.push(`Found on: ${pageTitle}`);
   lines.push(`Page: ${pageUrl}`);
 
-  // Context — the surrounding text that explains what this resource is for
+  // Section context — includes all sibling resources and explanatory text
+  // in the same section, giving the embedding much richer signal
   if (resource.context) {
     lines.push(`Context: ${resource.context}`);
   }
@@ -474,6 +562,7 @@ async function crawl() {
             resource_url: resource.resource_url || null,
             link_text: resource.link_text || "",
             section: resource.section || "",
+            section_path: resource.section_path || "",
             page_url: url,
             page_title: pageTitle,
             resource_type: resource.resource_type,
