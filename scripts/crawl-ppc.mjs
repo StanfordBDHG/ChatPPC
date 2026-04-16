@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * PPC Website Crawler
+ * PPC Website Crawler — Resource-Level Extraction
  *
- * Crawls https://med.stanford.edu/ppc using Playwright to discover all pages,
- * expand accordions/dropdowns, extract content as markdown, and upsert into
- * the Supabase vector store (same pipeline as ingest.mjs).
+ * Crawls https://med.stanford.edu/ppc using Playwright, expands all
+ * accordions/dropdowns, and extracts every individual link and piece of
+ * information as its own row in the Supabase documents table.
+ *
+ * Each row contains:
+ *   - A description of what the resource is and when to use it
+ *   - The resource URL (if applicable)
+ *   - Metadata: page_url, section, link_text, resource_type, crawled_at
+ *
+ * This produces small, focused documents that match well against user
+ * queries via embedding similarity search.
  *
  * Usage:
  *   node scripts/crawl-ppc.mjs                  # crawl full site
@@ -14,7 +22,6 @@
  */
 
 import { chromium } from "playwright";
-import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { createClient } from "@supabase/supabase-js";
 import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 import { OpenAIEmbeddings } from "@langchain/openai";
@@ -30,36 +37,37 @@ config({ path: join(process.cwd(), ".env.local") });
 
 const BASE_URL = "https://med.stanford.edu/ppc";
 const ALLOWED_PREFIX = "https://med.stanford.edu/ppc";
-const CONCURRENCY = 3; // parallel browser tabs
-const PAGE_TIMEOUT = 30_000; // 30s per page
-const NAV_WAIT = 2_000; // wait after navigation for JS to settle
+const CONCURRENCY = 3;
+const PAGE_TIMEOUT = 30_000;
+const NAV_WAIT = 2_000;
 
-// Parse CLI flags
+// Batch size for embedding API calls (avoid rate limits)
+const EMBED_BATCH_SIZE = 20;
+
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
 const maxPagesIdx = args.indexOf("--max-pages");
-const MAX_PAGES = maxPagesIdx !== -1 ? parseInt(args[maxPagesIdx + 1], 10) : Infinity;
+const MAX_PAGES =
+  maxPagesIdx !== -1 ? parseInt(args[maxPagesIdx + 1], 10) : Infinity;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getDocumentHash(content) {
+function getHash(content) {
   return createHash("sha256").update(content).digest("hex");
 }
 
-/** Normalize a URL: strip trailing slash, fragment, and query params */
-function normalizeUrl(raw) {
+/** Normalize a page URL for crawl queue (strip query, fragment, trailing slash) */
+function normalizePageUrl(raw) {
   try {
     const url = new URL(raw);
-    // Only keep pages under the PPC path
     if (!url.href.startsWith(ALLOWED_PREFIX)) return null;
-    // Skip non-HTML resources
     const ext = url.pathname.split(".").pop();
-    if (["pdf", "jpg", "jpeg", "png", "gif", "svg", "css", "js", "xml", "ico"].includes(ext)) {
+    if (
+      ["pdf", "jpg", "jpeg", "png", "gif", "svg", "css", "js", "xml", "ico"].includes(ext)
+    )
       return null;
-    }
-    // Strip query and fragment, normalize trailing slash
     url.search = "";
     url.hash = "";
     let normalized = url.href;
@@ -70,123 +78,40 @@ function normalizeUrl(raw) {
   }
 }
 
-/** Convert a page's rendered DOM into clean markdown-like text */
-async function extractPageContent(page) {
-  return page.evaluate(() => {
-    const main =
-      document.querySelector("main") ||
-      document.querySelector('[role="main"]') ||
-      document.querySelector("#content") ||
-      document.querySelector(".content-area") ||
-      document.body;
-
-    // Remove nav, footer, scripts, styles, hidden elements
-    const clone = main.cloneNode(true);
-    clone
-      .querySelectorAll(
-        'nav, footer, script, style, noscript, iframe, [aria-hidden="true"], .visually-hidden'
-      )
-      .forEach((el) => el.remove());
-
-    function nodeToMarkdown(node, depth = 0) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        return node.textContent.replace(/\s+/g, " ");
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) return "";
-
-      const tag = node.tagName.toLowerCase();
-
-      // Skip invisible elements
-      const style = window.getComputedStyle(node);
-      if (style.display === "none" || style.visibility === "hidden") return "";
-
-      let children = Array.from(node.childNodes)
-        .map((c) => nodeToMarkdown(c, depth))
-        .join("");
-
-      switch (tag) {
-        case "h1":
-          return `\n# ${children.trim()}\n`;
-        case "h2":
-          return `\n## ${children.trim()}\n`;
-        case "h3":
-          return `\n### ${children.trim()}\n`;
-        case "h4":
-          return `\n#### ${children.trim()}\n`;
-        case "h5":
-        case "h6":
-          return `\n##### ${children.trim()}\n`;
-        case "p":
-          return `\n${children.trim()}\n`;
-        case "br":
-          return "\n";
-        case "a": {
-          const href = node.getAttribute("href") || "";
-          const text = children.trim();
-          if (!text) return "";
-          if (href.startsWith("http") || href.startsWith("/")) {
-            const fullHref = href.startsWith("/")
-              ? `https://med.stanford.edu${href}`
-              : href;
-            return `[${text}](${fullHref})`;
-          }
-          return text;
-        }
-        case "ul":
-        case "ol":
-          return `\n${children}\n`;
-        case "li":
-          return `- ${children.trim()}\n`;
-        case "strong":
-        case "b":
-          return `**${children.trim()}**`;
-        case "em":
-        case "i":
-          return `*${children.trim()}*`;
-        case "table":
-          return `\n${children}\n`;
-        case "tr":
-          return `| ${children} |\n`;
-        case "th":
-        case "td":
-          return ` ${children.trim()} |`;
-        default:
-          return children;
-      }
-    }
-
-    const raw = nodeToMarkdown(clone);
-    // Clean up excessive whitespace
-    return raw
-      .replace(/\n{3,}/g, "\n\n")
-      .replace(/[ \t]+/g, " ")
-      .trim();
-  });
+/** Resolve a potentially relative href into a full URL */
+function resolveHref(href, pageUrl) {
+  if (!href || href.startsWith("javascript:") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+    return null;
+  }
+  try {
+    return new URL(href, pageUrl).href;
+  } catch {
+    return null;
+  }
 }
 
-/** Click all accordion/expandable elements on the page */
+/** Sleep utility */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ---------------------------------------------------------------------------
+// Accordion Expansion (unchanged from v1)
+// ---------------------------------------------------------------------------
+
 async function expandAccordions(page) {
-  // Common patterns for accordions, collapsible panels, and expand buttons
   const selectors = [
-    // aria-expanded buttons/elements
     '[aria-expanded="false"]',
-    // Common accordion class patterns
     ".accordion-toggle",
     ".accordion-header",
     ".accordion__trigger",
     ".collapse-toggle",
     ".expand-toggle",
-    // Details/summary elements
     "details:not([open]) summary",
-    // Bootstrap-style
     '[data-toggle="collapse"]',
     '[data-bs-toggle="collapse"]',
-    // Generic expand buttons
     'button[class*="expand"]',
     'button[class*="accordion"]',
     'button[class*="collapse"]',
     'button[class*="toggle"]',
-    // Stanford-specific patterns (Drupal/WP sites often use these)
     ".field-group-accordion .accordion-header",
     ".panel-heading a.collapsed",
     ".su-accordion__button",
@@ -197,7 +122,6 @@ async function expandAccordions(page) {
   ];
 
   let totalExpanded = 0;
-
   for (const selector of selectors) {
     try {
       const elements = await page.$$(selector);
@@ -205,23 +129,231 @@ async function expandAccordions(page) {
         try {
           await el.click({ timeout: 1000 });
           totalExpanded++;
-          // Small pause between clicks to let content render
           await page.waitForTimeout(300);
-        } catch {
-          // Element may not be clickable or visible, skip
+        } catch {}
+      }
+    } catch {}
+  }
+  if (totalExpanded > 0) await page.waitForTimeout(1000);
+  return totalExpanded;
+}
+
+// ---------------------------------------------------------------------------
+// Resource Extraction — the core new logic
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts structured resources from a rendered page.
+ *
+ * Returns an array of objects:
+ * {
+ *   resource_url: string | null,
+ *   link_text: string,
+ *   section: string,          // nearest heading
+ *   context: string,          // surrounding text (the paragraph / list item)
+ *   resource_type: "link" | "contact" | "info"
+ * }
+ */
+async function extractResources(page) {
+  return page.evaluate(() => {
+    const resources = [];
+    const seen = new Set(); // deduplicate by url+section
+
+    const main =
+      document.querySelector("main") ||
+      document.querySelector('[role="main"]') ||
+      document.querySelector("#content") ||
+      document.querySelector(".content-area") ||
+      document.body;
+
+    if (!main) return resources;
+
+    // Remove nav, footer, scripts, styles
+    const clone = main.cloneNode(true);
+    clone
+      .querySelectorAll(
+        'nav, footer, script, style, noscript, iframe, [aria-hidden="true"], .visually-hidden'
+      )
+      .forEach((el) => el.remove());
+
+    // Helper: walk up the DOM from an element to find the nearest heading
+    function findNearestHeading(el) {
+      // First check previous siblings and their children
+      let node = el;
+      while (node) {
+        let prev = node.previousElementSibling;
+        while (prev) {
+          if (/^H[1-6]$/.test(prev.tagName)) {
+            return prev.textContent.trim();
+          }
+          // Check last heading inside the previous sibling
+          const headings = prev.querySelectorAll("h1, h2, h3, h4, h5, h6");
+          if (headings.length > 0) {
+            return headings[headings.length - 1].textContent.trim();
+          }
+          prev = prev.previousElementSibling;
+        }
+        node = node.parentElement;
+        if (node && /^H[1-6]$/.test(node.tagName)) {
+          return node.textContent.trim();
         }
       }
-    } catch {
-      // Selector not found, skip
+      return "";
     }
+
+    // Helper: get the surrounding text context for a link
+    function getContext(el) {
+      // Walk up to the nearest block-level container
+      const blockTags = new Set([
+        "P", "LI", "DIV", "TD", "TH", "BLOCKQUOTE",
+        "SECTION", "ARTICLE", "DD", "DT", "FIGCAPTION",
+      ]);
+      let container = el.parentElement;
+      while (container && !blockTags.has(container.tagName)) {
+        container = container.parentElement;
+      }
+      if (!container) container = el.parentElement;
+      if (!container) return "";
+
+      // Get text content but limit length
+      const text = container.textContent.replace(/\s+/g, " ").trim();
+      return text.length > 500 ? text.substring(0, 500) + "..." : text;
+    }
+
+    // --- Extract links ---
+    const anchors = clone.querySelectorAll("a[href]");
+    for (const a of anchors) {
+      const href = a.getAttribute("href") || "";
+      const text = a.textContent.replace(/\s+/g, " ").trim();
+
+      // Skip empty links, anchor-only links, and navigation-like links
+      if (!text || text.length < 2) continue;
+      if (href === "#" || href === "") continue;
+
+      // Resolve full URL
+      let fullUrl;
+      if (href.startsWith("http")) {
+        fullUrl = href;
+      } else if (href.startsWith("/")) {
+        fullUrl = "https://med.stanford.edu" + href;
+      } else if (href.startsWith("mailto:") || href.startsWith("tel:")) {
+        // Capture contact info
+        const section = findNearestHeading(a);
+        const context = getContext(a);
+        const key = `contact:${href}:${section}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          resources.push({
+            resource_url: href,
+            link_text: text,
+            section,
+            context,
+            resource_type: "contact",
+          });
+        }
+        continue;
+      } else {
+        continue;
+      }
+
+      const section = findNearestHeading(a);
+      const context = getContext(a);
+      const key = `${fullUrl}:${section}`;
+
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      resources.push({
+        resource_url: fullUrl,
+        link_text: text,
+        section,
+        context,
+        resource_type: "link",
+      });
+    }
+
+    // --- Extract standalone phone numbers not in links ---
+    const phoneRegex =
+      /(?:(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4})/g;
+    const textNodes = [];
+    const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const text = node.textContent.trim();
+      if (text && phoneRegex.test(text)) {
+        // Only if not inside an <a> tag
+        let inAnchor = false;
+        let parent = node.parentElement;
+        while (parent && parent !== clone) {
+          if (parent.tagName === "A") {
+            inAnchor = true;
+            break;
+          }
+          parent = parent.parentElement;
+        }
+        if (!inAnchor) {
+          const container = node.parentElement;
+          const section = findNearestHeading(container);
+          const context = getContext(container);
+          const phones = text.match(phoneRegex);
+          for (const phone of phones) {
+            const key = `phone:${phone}:${section}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              resources.push({
+                resource_url: `tel:${phone.replace(/[^\d+]/g, "")}`,
+                link_text: phone,
+                section,
+                context,
+                resource_type: "contact",
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return resources;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Build document content for a single resource
+// ---------------------------------------------------------------------------
+
+/**
+ * Turns a raw extracted resource into a document string suitable for
+ * embedding. The format is designed so that semantic search matches
+ * on *what the resource is for* and *when to use it*.
+ */
+function buildDocumentContent(resource, pageTitle, pageUrl) {
+  const lines = [];
+
+  // Title line
+  if (resource.link_text) {
+    lines.push(`Resource: ${resource.link_text}`);
   }
 
-  if (totalExpanded > 0) {
-    // Wait for all expanded content to render
-    await page.waitForTimeout(1000);
+  // URL
+  if (resource.resource_url) {
+    lines.push(`URL: ${resource.resource_url}`);
   }
 
-  return totalExpanded;
+  // Section heading from the page
+  if (resource.section) {
+    lines.push(`Topic: ${resource.section}`);
+  }
+
+  // Page it was found on
+  lines.push(`Found on: ${pageTitle}`);
+  lines.push(`Page: ${pageUrl}`);
+
+  // Context — the surrounding text that explains what this resource is for
+  if (resource.context) {
+    lines.push(`Context: ${resource.context}`);
+  }
+
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -229,24 +361,34 @@ async function expandAccordions(page) {
 // ---------------------------------------------------------------------------
 
 async function crawl() {
-  console.log("=== PPC Website Crawler ===");
+  console.log("=== PPC Website Crawler (Resource-Level) ===");
   console.log(`Base URL: ${BASE_URL}`);
   console.log(`Dry run: ${DRY_RUN}`);
   console.log(`Max pages: ${MAX_PAGES === Infinity ? "unlimited" : MAX_PAGES}`);
   console.log();
 
-  // ---- Supabase + vector store setup (skip in dry-run) ----
-  let client, vectorStore, splitter;
+  // ---- Supabase + embeddings setup ----
+  let client, vectorStore;
 
   if (!DRY_RUN) {
-    const requiredEnvVars = ["SUPABASE_URL", "SUPABASE_PRIVATE_KEY", "OPENAI_API_KEY"];
+    const requiredEnvVars = [
+      "SUPABASE_URL",
+      "SUPABASE_PRIVATE_KEY",
+      "OPENAI_API_KEY",
+    ];
     const missing = requiredEnvVars.filter((v) => !process.env[v]);
     if (missing.length > 0) {
-      console.error("Missing required environment variables:", missing.join(", "));
+      console.error(
+        "Missing required environment variables:",
+        missing.join(", ")
+      );
       process.exit(1);
     }
 
-    client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PRIVATE_KEY);
+    client = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_PRIVATE_KEY
+    );
 
     vectorStore = new SupabaseVectorStore(new OpenAIEmbeddings(), {
       client,
@@ -255,113 +397,93 @@ async function crawl() {
     });
   }
 
-  splitter = new MarkdownTextSplitter({
-    chunkSize: 4000,
-    chunkOverlap: 200,
-  });
-
   // ---- Launch browser ----
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent:
-      "Mozilla/5.0 (compatible; ChatPPC-Crawler/1.0; +https://github.com/StanfordBDHG/ChatPPC)",
+      "Mozilla/5.0 (compatible; ChatPPC-Crawler/2.0; +https://github.com/StanfordBDHG/ChatPPC)",
     viewport: { width: 1280, height: 720 },
   });
 
   const visited = new Set();
   const queue = [BASE_URL];
-  const results = { crawled: 0, updated: 0, skipped: 0, errors: 0 };
+  const allDocuments = []; // { content, metadata } for all resources across all pages
+  const allSourceKeys = new Set(); // track all source keys for stale cleanup
+  const results = { pages: 0, resources: 0, errors: 0 };
 
-  /** Process a single URL */
-  async function processUrl(url) {
+  // ---- Process a single page ----
+  async function processPage(url) {
     if (visited.has(url)) return;
     if (visited.size >= MAX_PAGES) return;
     visited.add(url);
 
     const page = await context.newPage();
     try {
-      console.log(`[${visited.size}] Crawling: ${url}`);
+      console.log(`\n[${visited.size}] Crawling: ${url}`);
 
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: PAGE_TIMEOUT });
+      await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: PAGE_TIMEOUT,
+      });
       await page.waitForTimeout(NAV_WAIT);
 
-      // Expand all accordions and collapsible sections
+      // Expand accordions
       const expanded = await expandAccordions(page);
       if (expanded > 0) {
         console.log(`  Expanded ${expanded} accordion/collapsible elements`);
       }
 
-      // Discover links on this page
+      // Discover more pages to crawl
       const links = await page.$$eval("a[href]", (anchors) =>
         anchors.map((a) => a.href)
       );
       for (const link of links) {
-        const normalized = normalizeUrl(link);
-        if (normalized && !visited.has(normalized) && visited.size + queue.length < MAX_PAGES + visited.size) {
-          if (!queue.includes(normalized)) {
-            queue.push(normalized);
-          }
+        const normalized = normalizePageUrl(link);
+        if (normalized && !visited.has(normalized) && !queue.includes(normalized)) {
+          queue.push(normalized);
         }
       }
 
-      // Extract content
-      const content = await extractPageContent(page);
-      if (!content || content.length < 50) {
-        console.log(`  Skipped (too little content: ${content?.length || 0} chars)`);
-        results.skipped++;
-        return;
+      // Get page metadata
+      const pageTitle = await page.title();
+
+      // Extract all resources from this page
+      const resources = await extractResources(page);
+      console.log(`  Found ${resources.length} resources on page`);
+      console.log(`  Page title: ${pageTitle}`);
+
+      // Build documents for each resource
+      for (const resource of resources) {
+        const content = buildDocumentContent(resource, pageTitle, url);
+
+        // Create a unique, stable source key for this resource
+        // Using resource_url + section to make it unique per context
+        const sourceKey = `ppc-resource:${resource.resource_url || "info"}:${getHash(
+          `${resource.resource_url}:${resource.section}:${url}`
+        ).substring(0, 12)}`;
+
+        const hash = getHash(content);
+
+        allSourceKeys.add(sourceKey);
+
+        allDocuments.push({
+          content,
+          metadata: {
+            source: sourceKey,
+            hash,
+            resource_url: resource.resource_url || null,
+            link_text: resource.link_text || "",
+            section: resource.section || "",
+            page_url: url,
+            page_title: pageTitle,
+            resource_type: resource.resource_type,
+            crawled_at: new Date().toISOString(),
+          },
+        });
       }
 
-      // Get page title
-      const title = await page.title();
-
-      // Build the full document with URL header
-      const document = `# ${title}\n\nSource: ${url}\n\n${content}`;
-      const hash = getDocumentHash(document);
-      // Use the URL as the source identifier
-      const source = `ppc-crawl:${url}`;
-
-      console.log(`  Title: ${title}`);
-      console.log(`  Content length: ${document.length} chars`);
-      console.log(`  Hash: ${hash.substring(0, 12)}...`);
-
-      if (DRY_RUN) {
-        console.log(`  [DRY RUN] Would upsert to database`);
-        results.updated++;
-        return;
-      }
-
-      // Check existing hash
-      const { data: existing } = await client
-        .from("documents")
-        .select("metadata")
-        .eq("metadata->>source", source)
-        .maybeSingle();
-
-      const existingHash = existing?.metadata?.hash;
-
-      if (existingHash === hash) {
-        console.log(`  No changes (hash match) - skipping`);
-        results.skipped++;
-        return;
-      }
-
-      // Delete old chunks if content changed
-      if (existingHash) {
-        console.log(`  Content changed - deleting old chunks`);
-        await client.from("documents").delete().eq("metadata->>source", source);
-      }
-
-      // Split and embed
-      const splitDocs = await splitter.createDocuments(
-        [document],
-        [{ source, hash, url, title, crawled_at: new Date().toISOString() }]
-      );
-      console.log(`  Split into ${splitDocs.length} chunks - embedding...`);
-
-      await vectorStore.addDocuments(splitDocs);
-      console.log(`  Stored successfully`);
-      results.updated++;
+      results.pages++;
+      results.resources += resources.length;
     } catch (error) {
       console.error(`  Error: ${error.message}`);
       results.errors++;
@@ -372,57 +494,130 @@ async function crawl() {
 
   // ---- BFS crawl with concurrency ----
   while (queue.length > 0 && visited.size < MAX_PAGES) {
-    // Take up to CONCURRENCY URLs from the queue
     const batch = [];
-    while (batch.length < CONCURRENCY && queue.length > 0 && visited.size + batch.length < MAX_PAGES) {
+    while (
+      batch.length < CONCURRENCY &&
+      queue.length > 0 &&
+      visited.size + batch.length < MAX_PAGES
+    ) {
       const url = queue.shift();
       if (!visited.has(url)) {
         batch.push(url);
       }
     }
-
     if (batch.length === 0) break;
-
-    await Promise.all(batch.map((url) => processUrl(url)));
+    await Promise.all(batch.map((url) => processPage(url)));
   }
 
   await browser.close();
 
-  // ---- Summary ----
-  console.log("\n=== Crawl Complete ===");
-  console.log(`Pages visited:  ${visited.size}`);
-  console.log(`Updated in DB:  ${results.updated}`);
-  console.log(`Skipped (unchanged): ${results.skipped}`);
-  console.log(`Errors:         ${results.errors}`);
-
-  if (DRY_RUN) {
-    console.log("\n(Dry run - no database changes were made)");
+  // ---- Deduplicate resources across pages ----
+  // The same link may appear on multiple pages. Keep the one with the most
+  // context, keyed by resource_url.
+  console.log(`\n--- Deduplicating resources ---`);
+  const byResourceUrl = new Map();
+  for (const doc of allDocuments) {
+    const key = doc.metadata.resource_url;
+    if (!key) {
+      // Non-link resources: keep all
+      byResourceUrl.set(doc.metadata.source, doc);
+      continue;
+    }
+    const existing = byResourceUrl.get(key);
+    if (!existing || doc.content.length > existing.content.length) {
+      byResourceUrl.set(key, doc);
+    }
   }
+  const dedupedDocuments = [...byResourceUrl.values()];
+  console.log(
+    `  ${allDocuments.length} total → ${dedupedDocuments.length} after dedup`
+  );
 
-  // Clean up pages that no longer exist on the site
-  if (!DRY_RUN && visited.size > 0) {
-    console.log("\n--- Cleaning up stale pages ---");
-    const { data: allCrawled } = await client
+  // ---- Upsert to database ----
+  if (DRY_RUN) {
+    console.log(`\n--- DRY RUN: Sample of extracted resources ---`);
+    for (const doc of dedupedDocuments.slice(0, 15)) {
+      console.log(`\n  [${doc.metadata.resource_type}] ${doc.metadata.link_text}`);
+      console.log(`  URL: ${doc.metadata.resource_url}`);
+      console.log(`  Section: ${doc.metadata.section}`);
+      console.log(`  Page: ${doc.metadata.page_url}`);
+      console.log(`  Content length: ${doc.content.length} chars`);
+    }
+    if (dedupedDocuments.length > 15) {
+      console.log(`\n  ... and ${dedupedDocuments.length - 15} more resources`);
+    }
+  } else {
+    console.log(`\n--- Upserting ${dedupedDocuments.length} resources to Supabase ---`);
+
+    // First, delete all old ppc-resource: entries in one go.
+    // This is simpler and safer than per-resource change detection when the
+    // source key scheme itself might have changed.
+    console.log(`  Deleting old crawled resources...`);
+    const { error: deleteError } = await client
       .from("documents")
-      .select("metadata")
+      .delete()
+      .like("metadata->>source", "ppc-resource:%");
+    if (deleteError) {
+      console.error(`  Warning: delete failed: ${deleteError.message}`);
+    }
+
+    // Also clean up any old ppc-crawl: entries from the previous crawler version
+    await client
+      .from("documents")
+      .delete()
       .like("metadata->>source", "ppc-crawl:%");
 
-    if (allCrawled) {
-      const crawledSources = new Set(allCrawled.map((d) => d.metadata?.source));
-      const activeSources = new Set(
-        [...visited].map((url) => `ppc-crawl:${url}`)
-      );
+    // Insert in batches
+    let inserted = 0;
+    for (let i = 0; i < dedupedDocuments.length; i += EMBED_BATCH_SIZE) {
+      const batch = dedupedDocuments.slice(i, i + EMBED_BATCH_SIZE);
 
-      let staleCount = 0;
-      for (const source of crawledSources) {
-        if (source && !activeSources.has(source)) {
-          console.log(`  Removing stale: ${source}`);
-          await client.from("documents").delete().eq("metadata->>source", source);
-          staleCount++;
+      const langchainDocs = batch.map((doc) => ({
+        pageContent: doc.content,
+        metadata: doc.metadata,
+      }));
+
+      try {
+        await vectorStore.addDocuments(langchainDocs);
+        inserted += batch.length;
+        console.log(
+          `  Embedded and stored batch ${Math.floor(i / EMBED_BATCH_SIZE) + 1}/${Math.ceil(dedupedDocuments.length / EMBED_BATCH_SIZE)} (${inserted}/${dedupedDocuments.length})`
+        );
+      } catch (err) {
+        console.error(
+          `  Error on batch ${Math.floor(i / EMBED_BATCH_SIZE) + 1}: ${err.message}`
+        );
+        // Retry one by one
+        for (const doc of batch) {
+          try {
+            await vectorStore.addDocuments([
+              { pageContent: doc.content, metadata: doc.metadata },
+            ]);
+            inserted++;
+          } catch (e2) {
+            console.error(`  Failed single doc: ${e2.message}`);
+          }
         }
       }
-      console.log(`Removed ${staleCount} stale page(s)`);
+
+      // Small delay between batches to avoid rate limits
+      if (i + EMBED_BATCH_SIZE < dedupedDocuments.length) {
+        await sleep(500);
+      }
     }
+
+    console.log(`  Successfully stored ${inserted} resources`);
+  }
+
+  // ---- Summary ----
+  console.log("\n=== Crawl Complete ===");
+  console.log(`Pages visited:     ${results.pages}`);
+  console.log(`Resources found:   ${results.resources}`);
+  console.log(`After dedup:       ${dedupedDocuments.length}`);
+  console.log(`Errors:            ${results.errors}`);
+
+  if (DRY_RUN) {
+    console.log("\n(Dry run — no database changes were made)");
   }
 }
 
