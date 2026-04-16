@@ -98,7 +98,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------------------------------------------------------------------------
 
 async function expandAccordions(page) {
-  // Phase 1: Click known accordion selectors
   const selectors = [
     '[aria-expanded="false"]',
     ".accordion-toggle",
@@ -120,8 +119,6 @@ async function expandAccordions(page) {
     '[class*="collapsible"] > [class*="header"]',
     '[class*="collapsible"] > [class*="title"]',
     '[class*="expandable"] button',
-    // Stanford panel_builder: anchor links that point to accordion panels
-    'a[href*="accordion"]',
   ];
 
   let totalExpanded = 0;
@@ -137,28 +134,6 @@ async function expandAccordions(page) {
       }
     } catch {}
   }
-
-  // Phase 2: Force all hidden content visible via CSS override.
-  // Stanford's panel_builder hides accordion content with display:none
-  // or height:0. This ensures the DOM extraction sees everything.
-  try {
-    await page.evaluate(() => {
-      const style = document.createElement("style");
-      style.textContent = `
-        [class*="accordion"] { display: block !important; visibility: visible !important; height: auto !important; max-height: none !important; overflow: visible !important; opacity: 1 !important; }
-        [class*="panel_builder"] [class*="content"] { display: block !important; visibility: visible !important; height: auto !important; max-height: none !important; overflow: visible !important; opacity: 1 !important; }
-        [class*="collapse"]:not(.navbar-collapse) { display: block !important; visibility: visible !important; height: auto !important; }
-        [hidden] { display: block !important; }
-        details > *:not(summary) { display: block !important; }
-      `;
-      document.head.appendChild(style);
-      document.querySelectorAll("details:not([open])").forEach((d) => {
-        d.setAttribute("open", "");
-      });
-    });
-    await page.waitForTimeout(500);
-  } catch {}
-
   if (totalExpanded > 0) await page.waitForTimeout(1000);
   return totalExpanded;
 }
