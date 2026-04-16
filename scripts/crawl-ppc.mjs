@@ -176,39 +176,73 @@ async function extractResources(page) {
       )
       .forEach((el) => el.remove());
 
-    // Helper: find the full heading breadcrumb path for an element.
-    // Returns something like "Health Supervision > Sports" by collecting
-    // all headings (h1–h6) that precede this element at increasing levels.
-    function findHeadingPath(el) {
-      const headings = []; // [ { level, text } ]
+    // --- Heading-like detection ---
+    // Stanford sites use <strong>/<b> inside <p> as section labels
+    // (e.g. "Vanderbilt Scales") instead of proper heading tags.
+    function isHeadingLike(el) {
+      if (/^H[1-6]$/.test(el.tagName)) return true;
+      // Standalone <strong>/<b> that is the main child of a <p>/<div>
+      if (el.tagName === "STRONG" || el.tagName === "B") {
+        const parent = el.parentElement;
+        if (parent && (parent.tagName === "P" || parent.tagName === "DIV")) {
+          const boldText = el.textContent.trim();
+          const parentText = parent.textContent.trim();
+          if (boldText.length > 3 && boldText.length >= parentText.length * 0.6) return true;
+        }
+      }
+      // A <p>/<div> whose only child is <strong>/<b>
+      if (el.tagName === "P" || el.tagName === "DIV") {
+        const ch = el.children;
+        if (ch.length === 1 && (ch[0].tagName === "STRONG" || ch[0].tagName === "B")) {
+          const t = ch[0].textContent.trim();
+          if (t.length > 3 && t.length < 100) return true;
+        }
+      }
+      return false;
+    }
 
-      // Walk backwards through the document to find preceding headings
+    function getHeadingText(el) {
+      if (/^H[1-6]$/.test(el.tagName)) return el.textContent.trim();
+      if (el.tagName === "STRONG" || el.tagName === "B") return el.textContent.trim();
+      const bold = el.querySelector("strong, b");
+      if (bold) return bold.textContent.trim();
+      return el.textContent.trim();
+    }
+
+    function getHeadingLevel(el) {
+      if (/^H[1-6]$/.test(el.tagName)) return parseInt(el.tagName[1], 10);
+      return 7; // bold labels rank below all real headings
+    }
+
+    function findAllHeadingLike(container) {
+      const results = [];
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT);
+      while (walker.nextNode()) {
+        if (isHeadingLike(walker.currentNode)) results.push(walker.currentNode);
+      }
+      return results;
+    }
+
+    // --- Heading path & nearest heading ---
+
+    function findHeadingPath(el) {
+      const headings = [];
       let node = el;
       while (node && node !== clone) {
         let prev = node.previousElementSibling;
         while (prev) {
-          if (/^H[1-6]$/.test(prev.tagName)) {
-            const level = parseInt(prev.tagName[1], 10);
-            const text = prev.textContent.trim();
-            // Only add if it's a higher level than what we already have,
-            // or if we don't have any headings yet
-            if (
-              text &&
-              (headings.length === 0 || level < headings[0].level)
-            ) {
+          if (isHeadingLike(prev)) {
+            const level = getHeadingLevel(prev);
+            const text = getHeadingText(prev);
+            if (text && (headings.length === 0 || level < headings[0].level)) {
               headings.unshift({ level, text });
             }
           }
-          // Also check headings inside the previous sibling
-          const innerHeadings = prev.querySelectorAll("h1, h2, h3, h4, h5, h6");
-          for (let i = innerHeadings.length - 1; i >= 0; i--) {
-            const h = innerHeadings[i];
-            const level = parseInt(h.tagName[1], 10);
-            const text = h.textContent.trim();
-            if (
-              text &&
-              (headings.length === 0 || level < headings[0].level)
-            ) {
+          const inner = findAllHeadingLike(prev);
+          for (let i = inner.length - 1; i >= 0; i--) {
+            const level = getHeadingLevel(inner[i]);
+            const text = getHeadingText(inner[i]);
+            if (text && (headings.length === 0 || level < headings[0].level)) {
               headings.unshift({ level, text });
             }
           }
@@ -216,50 +250,58 @@ async function extractResources(page) {
         }
         node = node.parentElement;
       }
-
       return headings.map((h) => h.text).join(" > ");
     }
 
-    // Helper: find just the nearest (most specific) heading
     function findNearestHeading(el) {
       let node = el;
       while (node && node !== clone) {
         let prev = node.previousElementSibling;
         while (prev) {
-          if (/^H[1-6]$/.test(prev.tagName)) {
-            return prev.textContent.trim();
-          }
-          const headings = prev.querySelectorAll("h1, h2, h3, h4, h5, h6");
-          if (headings.length > 0) {
-            return headings[headings.length - 1].textContent.trim();
-          }
+          if (isHeadingLike(prev)) return getHeadingText(prev);
+          const inner = findAllHeadingLike(prev);
+          if (inner.length > 0) return getHeadingText(inner[inner.length - 1]);
           prev = prev.previousElementSibling;
         }
         node = node.parentElement;
-        if (node && /^H[1-6]$/.test(node.tagName)) {
-          return node.textContent.trim();
-        }
+        if (node && isHeadingLike(node)) return getHeadingText(node);
       }
       return "";
     }
 
-    // Helper: get the section-level context — all text between the nearest
-    // heading and the next heading at the same or higher level.
-    // This captures sibling resources and explanatory text in the section.
+    // --- Context: captures BOTH section text AND immediate surrounding text ---
+
+    // Get the immediate container text (paragraph, list item, etc.)
+    function getImmediateContext(el) {
+      const blockTags = new Set([
+        "P", "LI", "DIV", "TD", "TH", "BLOCKQUOTE",
+        "SECTION", "ARTICLE", "DD", "DT",
+      ]);
+      let container = el.parentElement;
+      while (container && !blockTags.has(container.tagName)) {
+        container = container.parentElement;
+      }
+      if (!container) container = el.parentElement;
+      if (!container) return "";
+      const text = container.textContent.replace(/\s+/g, " ").trim();
+      return text.length > 400 ? text.substring(0, 400) + "..." : text;
+    }
+
+    // Get the broader section context (text between nearest heading and next)
     function getSectionContext(el) {
-      // Find the nearest heading element before this element
+      // Find the nearest heading-like element before this element
       let headingEl = null;
       let node = el;
       outer: while (node && node !== clone) {
         let prev = node.previousElementSibling;
         while (prev) {
-          if (/^H[1-6]$/.test(prev.tagName)) {
+          if (isHeadingLike(prev)) {
             headingEl = prev;
             break outer;
           }
-          const headings = prev.querySelectorAll("h1, h2, h3, h4, h5, h6");
-          if (headings.length > 0) {
-            headingEl = headings[headings.length - 1];
+          const inner = findAllHeadingLike(prev);
+          if (inner.length > 0) {
+            headingEl = inner[inner.length - 1];
             break outer;
           }
           prev = prev.previousElementSibling;
@@ -267,25 +309,28 @@ async function extractResources(page) {
         node = node.parentElement;
       }
 
+      // Get the immediate text around the link
+      const immediateText = getImmediateContext(el);
+
       if (!headingEl) {
-        // Fallback: get immediate container text
-        const container = el.closest("p, li, div, td, section") || el.parentElement;
-        const text = container ? container.textContent.replace(/\s+/g, " ").trim() : "";
-        return text.length > 800 ? text.substring(0, 800) + "..." : text;
+        return immediateText || (() => {
+          const container = el.closest("p, li, div, td, section") || el.parentElement;
+          const text = container ? container.textContent.replace(/\s+/g, " ").trim() : "";
+          return text.length > 800 ? text.substring(0, 800) + "..." : text;
+        })();
       }
 
-      // Collect text from the heading through subsequent siblings until
-      // we hit another heading of the same or higher level
-      const headingLevel = parseInt(headingEl.tagName[1], 10);
-      const parts = [headingEl.textContent.trim()];
+      // Collect section text from the heading through subsequent siblings
+      // until we hit another heading-like element of the same or higher level
+      const headingLevel = getHeadingLevel(headingEl);
+      const parts = [getHeadingText(headingEl)];
       let sibling = headingEl.nextElementSibling;
       let charCount = parts[0].length;
 
       while (sibling && charCount < 1200) {
-        if (/^H[1-6]$/.test(sibling.tagName)) {
-          const sibLevel = parseInt(sibling.tagName[1], 10);
+        if (isHeadingLike(sibling)) {
+          const sibLevel = getHeadingLevel(sibling);
           if (sibLevel <= headingLevel) break; // next section starts
-          // Sub-heading: include it
         }
         const text = sibling.textContent.replace(/\s+/g, " ").trim();
         if (text) {
@@ -295,8 +340,12 @@ async function extractResources(page) {
         sibling = sibling.nextElementSibling;
       }
 
-      const result = parts.join(" | ");
-      return result.length > 1200 ? result.substring(0, 1200) + "..." : result;
+      // Combine section context with immediate surrounding text
+      let result = parts.join(" | ");
+      if (immediateText && !result.includes(immediateText.substring(0, 50))) {
+        result = result + " | Nearby text: " + immediateText;
+      }
+      return result.length > 1500 ? result.substring(0, 1500) + "..." : result;
     }
 
     // --- Extract links ---
