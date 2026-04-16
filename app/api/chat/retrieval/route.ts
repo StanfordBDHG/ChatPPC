@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
+import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 import { Document } from "@langchain/core/documents";
 import { RunnableSequence } from "@langchain/core/runnables";
 import {
@@ -62,6 +63,63 @@ Question: {question}
 const answerPrompt = PromptTemplate.fromTemplate(ANSWER_TEMPLATE);
 
 /**
+ * Keyword search: finds documents containing query terms via ILIKE.
+ * This catches results that embedding similarity might miss, especially
+ * for short documents with sparse context.
+ */
+async function keywordSearch(
+  client: any,
+  query: string,
+  limit: number = 5,
+): Promise<Document[]> {
+  // Extract meaningful words (3+ chars, skip common stop words)
+  const stopWords = new Set([
+    "the", "and", "for", "are", "but", "not", "you", "all",
+    "can", "her", "was", "one", "our", "out", "how", "has",
+    "its", "let", "may", "who", "did", "get", "she", "him",
+    "his", "had", "any", "been", "from", "have", "this",
+    "that", "with", "what", "when", "where", "which", "about",
+  ]);
+  const words = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !stopWords.has(w));
+
+  if (words.length === 0) return [];
+
+  // Search for documents containing any of the query words
+  // Use the longest/most specific words first for better matching
+  const sortedWords = words.sort((a, b) => b.length - a.length);
+
+  const results: Document[] = [];
+  const seenIds = new Set<number>();
+
+  for (const word of sortedWords.slice(0, 3)) {
+    const { data, error } = await client
+      .from("documents")
+      .select("id, content, metadata")
+      .ilike("content", `%${word}%`)
+      .limit(limit);
+
+    if (!error && data) {
+      for (const row of data) {
+        if (!seenIds.has(row.id)) {
+          seenIds.add(row.id);
+          results.push(
+            new Document({
+              pageContent: row.content,
+              metadata: row.metadata,
+            }),
+          );
+        }
+      }
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
+/**
  * This handler initializes and calls a retrieval chain. It composes the chain using
  * LangChain Expression Language. See the docs for more information:
  *
@@ -83,55 +141,11 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_PRIVATE_KEY!,
     );
-    const embeddings = new OpenAIEmbeddings();
-
-    /**
-     * Hybrid search: combines vector similarity with keyword matching.
-     * Falls back to pure vector search if hybrid_search function
-     * doesn't exist yet (migration not run).
-     */
-    const hybridRetrieve = async (query: string): Promise<Document[]> => {
-      const queryEmbedding = await embeddings.embedQuery(query);
-
-      // Try hybrid search first (vector + keyword boost)
-      try {
-        const { data, error } = await client.rpc("hybrid_search", {
-          query_embedding: queryEmbedding,
-          query_text: query,
-          match_count: 10,
-          filter: {},
-        });
-
-        if (!error && data && data.length > 0) {
-          return data.map(
-            (row: any) =>
-              new Document({
-                pageContent: row.content,
-                metadata: row.metadata,
-              }),
-          );
-        }
-      } catch {
-        // hybrid_search function may not exist yet, fall back
-      }
-
-      // Fallback: standard vector search via match_documents
-      const { data: fallbackData, error } = await client.rpc("match_documents", {
-        query_embedding: queryEmbedding,
-        match_count: 10,
-        filter: {},
-      });
-
-      if (error) throw new Error(error.message);
-
-      return (fallbackData ?? []).map(
-        (row: any) =>
-          new Document({
-            pageContent: row.content,
-            metadata: row.metadata,
-          }),
-      );
-    }
+    const vectorstore = new SupabaseVectorStore(new OpenAIEmbeddings(), {
+      client,
+      tableName: "documents",
+      queryName: "match_documents",
+    });
 
     const standaloneQuestionChain = RunnableSequence.from([
       condenseQuestionPrompt,
@@ -139,17 +153,59 @@ export async function POST(req: NextRequest) {
       new StringOutputParser(),
     ]);
 
-    let resolvedDocuments: Document[] = [];
+    let resolveWithDocuments: (value: Document[]) => void;
+    const documentPromise = new Promise<Document[]>((resolve) => {
+      resolveWithDocuments = resolve;
+    });
 
-    const retrievalChain = async (question: string) => {
-      const docs = await hybridRetrieve(question);
-      resolvedDocuments = docs;
-      return combineDocumentsFn(docs);
+    const retriever = vectorstore.asRetriever({
+      k: 10,
+      searchType: "similarity",
+      callbacks: [
+        {
+          handleRetrieverEnd(documents) {
+            resolveWithDocuments(documents);
+          },
+        },
+      ],
+    });
+
+    /**
+     * Combined retrieval: vector similarity (via LangChain) + keyword search.
+     * Merges results and deduplicates so the LLM sees the best of both.
+     */
+    const combinedRetrievalChain = async (question: string) => {
+      // Run vector and keyword searches in parallel
+      const [vectorDocs, keywordDocs] = await Promise.all([
+        retriever.invoke(question),
+        keywordSearch(client, question, 5),
+      ]);
+
+      // Merge: vector results first, then keyword results not already present
+      const seen = new Set<string>();
+      const merged: Document[] = [];
+
+      for (const doc of vectorDocs) {
+        const key = doc.pageContent.slice(0, 100);
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(doc);
+        }
+      }
+      for (const doc of keywordDocs) {
+        const key = doc.pageContent.slice(0, 100);
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(doc);
+        }
+      }
+
+      return combineDocumentsFn(merged);
     };
 
     const answerChain = RunnableSequence.from([
       {
-        context: async (input: any) => retrievalChain(input.question),
+        context: async (input: any) => combinedRetrievalChain(input.question),
         chat_history: (input: any) => input.chat_history,
         question: (input: any) => input.question,
       },
@@ -171,9 +227,10 @@ export async function POST(req: NextRequest) {
       chat_history: formatVercelMessages(previousMessages),
     });
 
+    const documents = await documentPromise;
     const serializedSources = Buffer.from(
       JSON.stringify(
-        resolvedDocuments.map((doc) => {
+        documents.map((doc) => {
           return {
             pageContent: doc.pageContent.slice(0, 50) + "...",
             metadata: doc.metadata,
