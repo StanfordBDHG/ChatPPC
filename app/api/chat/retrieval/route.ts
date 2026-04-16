@@ -5,7 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
-import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 import { Document } from "@langchain/core/documents";
 import { RunnableSequence } from "@langchain/core/runnables";
 import {
@@ -84,54 +83,75 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_PRIVATE_KEY!,
     );
-    const vectorstore = new SupabaseVectorStore(new OpenAIEmbeddings(), {
-      client,
-      tableName: "documents",
-      queryName: "match_documents",
-    });
+    const embeddings = new OpenAIEmbeddings();
 
     /**
-     * We use LangChain Expression Language to compose two chains.
-     * To learn more, see the guide here:
-     *
-     * https://js.langchain.com/docs/guides/expression_language/cookbook
-     *
-     * You can also use the "createRetrievalChain" method with a
-     * "historyAwareRetriever" to get something prebaked.
+     * Hybrid search: combines vector similarity with keyword matching.
+     * Falls back to pure vector search if hybrid_search function
+     * doesn't exist yet (migration not run).
      */
+    const hybridRetrieve = async (query: string): Promise<Document[]> => {
+      const queryEmbedding = await embeddings.embedQuery(query);
+
+      // Try hybrid search first (vector + keyword boost)
+      try {
+        const { data, error } = await client.rpc("hybrid_search", {
+          query_embedding: queryEmbedding,
+          query_text: query,
+          match_count: 10,
+          filter: {},
+        });
+
+        if (!error && data && data.length > 0) {
+          return data.map(
+            (row: any) =>
+              new Document({
+                pageContent: row.content,
+                metadata: row.metadata,
+              }),
+          );
+        }
+      } catch {
+        // hybrid_search function may not exist yet, fall back
+      }
+
+      // Fallback: standard vector search via match_documents
+      const { data: fallbackData, error } = await client.rpc("match_documents", {
+        query_embedding: queryEmbedding,
+        match_count: 10,
+        filter: {},
+      });
+
+      if (error) throw new Error(error.message);
+
+      return (fallbackData ?? []).map(
+        (row: any) =>
+          new Document({
+            pageContent: row.content,
+            metadata: row.metadata,
+          }),
+      );
+    }
+
     const standaloneQuestionChain = RunnableSequence.from([
       condenseQuestionPrompt,
       model,
       new StringOutputParser(),
     ]);
 
-    let resolveWithDocuments: (value: Document[]) => void;
-    const documentPromise = new Promise<Document[]>((resolve) => {
-      resolveWithDocuments = resolve;
-    });
+    let resolvedDocuments: Document[] = [];
 
-    const retriever = vectorstore.asRetriever({
-      k: 5, // Limit to top 5 most relevant documents
-      searchType: "similarity",
-      callbacks: [
-        {
-          handleRetrieverEnd(documents) {
-            resolveWithDocuments(documents);
-          },
-        },
-      ],
-    });
-
-    const retrievalChain = retriever.pipe(combineDocumentsFn);
+    const retrievalChain = async (question: string) => {
+      const docs = await hybridRetrieve(question);
+      resolvedDocuments = docs;
+      return combineDocumentsFn(docs);
+    };
 
     const answerChain = RunnableSequence.from([
       {
-        context: RunnableSequence.from([
-          (input) => input.question,
-          retrievalChain,
-        ]),
-        chat_history: (input) => input.chat_history,
-        question: (input) => input.question,
+        context: async (input: any) => retrievalChain(input.question),
+        chat_history: (input: any) => input.chat_history,
+        question: (input: any) => input.question,
       },
       answerPrompt,
       model,
@@ -140,7 +160,7 @@ export async function POST(req: NextRequest) {
     const conversationalRetrievalQAChain = RunnableSequence.from([
       {
         question: standaloneQuestionChain,
-        chat_history: (input) => input.chat_history,
+        chat_history: (input: any) => input.chat_history,
       },
       answerChain,
       new BytesOutputParser(),
@@ -151,10 +171,9 @@ export async function POST(req: NextRequest) {
       chat_history: formatVercelMessages(previousMessages),
     });
 
-    const documents = await documentPromise;
     const serializedSources = Buffer.from(
       JSON.stringify(
-        documents.map((doc) => {
+        resolvedDocuments.map((doc) => {
           return {
             pageContent: doc.pageContent.slice(0, 50) + "...",
             metadata: doc.metadata,
