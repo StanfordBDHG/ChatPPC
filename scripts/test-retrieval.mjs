@@ -58,15 +58,47 @@ async function main() {
     }
   }
 
-  console.log('\n=== MERGED top 12 (by best similarity per id) ===');
-  Array.from(bestById.values())
+  const merged = Array.from(bestById.values())
     .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 12)
-    .forEach((d, i) => {
-      console.log(`[${i}] id=${d.id} sim=${d.similarity.toFixed(3)}`);
-      console.log(`    title: ${d.metadata?.link_text}`);
-      console.log(`    url:   ${d.metadata?.resource_url}`);
-    });
+    .slice(0, 15);
+
+  console.log('\n=== MERGED top 15 (pre-rerank) ===');
+  merged.forEach((d, i) => {
+    console.log(`[${i}] id=${d.id} sim=${d.similarity.toFixed(3)} section=${d.metadata?.section_path}`);
+    console.log(`    title: ${d.metadata?.link_text}`);
+  });
+
+  // ---- LLM reranker (mirrors rerankWithLLM in route.ts) ----
+  const numbered = merged
+    .map((d, i) => `[${i}] ${d.content.replace(/\n+/g, ' ').slice(0, 500)}`)
+    .join('\n');
+  const rerankPrompt = `You are scoring how relevant each retrieved resource is to a user's question. For each document, output a single line in the exact format "INDEX: SCORE" where SCORE is 0-10 (10 = directly answers the question, 0 = unrelated topic). Pay close attention to the "Section:" field — a resource from an unrelated clinical section should score low even if it shares keywords.
+
+Question: ${question}
+
+Documents:
+${numbered}
+
+Output the scores, one per line, nothing else:`;
+  const rerankRaw = (await model.invoke(rerankPrompt)).content;
+  const scores = new Map();
+  for (const line of rerankRaw.split('\n')) {
+    const m = line.match(/\[?(\d+)\]?\s*[:\-]?\s*(\d+(?:\.\d+)?)/);
+    if (m) {
+      const idx = parseInt(m[1], 10);
+      const score = parseFloat(m[2]);
+      if (idx >= 0 && idx < merged.length && !isNaN(score)) scores.set(idx, score);
+    }
+  }
+  const reranked = merged
+    .map((d, i) => ({ d, score: scores.get(i) ?? 0, idx: i }))
+    .sort((a, b) => b.score - a.score || a.idx - b.idx);
+
+  console.log('\n=== RERANKED top 8 ===');
+  reranked.slice(0, 8).forEach(({ d, score }, i) => {
+    console.log(`[${i}] score=${score} id=${d.id} sim=${d.similarity.toFixed(3)} section=${d.metadata?.section_path}`);
+    console.log(`    title: ${d.metadata?.link_text}`);
+  });
 
   // Target check: does the "low point of care hemoglobin" doc appear?
   const target = Array.from(bestById.values()).find(d =>

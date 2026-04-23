@@ -463,21 +463,28 @@ async function extractResources(page) {
 function buildDocumentContent(resource, pageTitle, pageUrl) {
   const lines = [];
 
-  // Title line
+  // Put the section path FIRST so clinical-area terms dominate the embedding.
+  // This prevents generic titles like "Treatment program options" (under
+  // Nutrition) from leaking into unrelated topic queries via the "options"
+  // token alone.
+  const sectionPath = resource.section_path || resource.section || "";
+  if (sectionPath) {
+    lines.push(`Section: ${sectionPath}`);
+  }
+
+  // Title, qualified by its section so the title's embedding also carries
+  // the topic.
   if (resource.link_text) {
-    lines.push(`Resource: ${resource.link_text}`);
+    if (sectionPath) {
+      lines.push(`Resource: ${resource.link_text} (${sectionPath})`);
+    } else {
+      lines.push(`Resource: ${resource.link_text}`);
+    }
   }
 
   // URL
   if (resource.resource_url) {
     lines.push(`URL: ${resource.resource_url}`);
-  }
-
-  // Full section path (e.g. "Health Supervision > Sports")
-  if (resource.section_path) {
-    lines.push(`Section: ${resource.section_path}`);
-  } else if (resource.section) {
-    lines.push(`Topic: ${resource.section}`);
   }
 
   // Page it was found on

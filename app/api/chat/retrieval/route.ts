@@ -56,6 +56,8 @@ const ANSWER_TEMPLATE = `You should answer staff members' questions about our cl
 
 If you can't find the answer to the question by searching the knowledge attached, you should state that: "The information you are requesting does not exist on the Stanford PPC site. Sometimes, ChatPPC can make mistakes though. If you think that this is an error, click on the PPC webiste link above to search the site manually. Have feedback? Be sure to use the button in the top left of the screen."
 
+Each entry in the context begins with a "Section:" line identifying the clinical area the resource belongs to (e.g. "Development and Behavior", "Nutrition and Healthy Lifestyle", "Health Supervision"). If a retrieved entry's Section is not topically related to the user's question, ignore that entry — do not cite it, link it, or mention it. Only use entries whose Section matches the topic being asked about.
+
 Answer the question based only on the following context and chat history:
 <context>
   {context}
@@ -103,6 +105,61 @@ async function hybridSearch(
   );
 }
 
+// LLM reranker: read the query and each retrieved doc jointly and score
+// them 0-10 for topical relevance. Catches cases where embedding similarity
+// is high but the topic is wrong (e.g. "Treatment program options" under
+// Nutrition matching "ADHD medication options" via the word "options").
+async function rerankWithLLM(
+  model: ChatOpenAI,
+  question: string,
+  docs: Document[],
+  keep: number,
+): Promise<Document[]> {
+  if (docs.length <= keep) return docs;
+
+  const numbered = docs
+    .map((d, i) => `[${i}] ${d.pageContent.replace(/\n+/g, " ").slice(0, 500)}`)
+    .join("\n");
+
+  const prompt = `You are scoring how relevant each retrieved resource is to a user's question. For each document, output a single line in the exact format "INDEX: SCORE" where SCORE is 0-10 (10 = directly answers the question, 0 = unrelated topic). Pay close attention to the "Section:" field — a resource from an unrelated clinical section should score low even if it shares keywords.
+
+Question: ${question}
+
+Documents:
+${numbered}
+
+Output the scores, one per line, nothing else:`;
+
+  let raw = "";
+  try {
+    const res = await model.invoke(prompt);
+    raw = typeof res.content === "string"
+      ? res.content
+      : String((res as any).content ?? "");
+  } catch (e) {
+    console.error("rerank failed, falling back to original order:", e);
+    return docs.slice(0, keep);
+  }
+
+  const scores = new Map<number, number>();
+  for (const line of raw.split("\n")) {
+    const m = line.match(/\[?(\d+)\]?\s*[:\-]?\s*(\d+(?:\.\d+)?)/);
+    if (m) {
+      const idx = parseInt(m[1], 10);
+      const score = parseFloat(m[2]);
+      if (idx >= 0 && idx < docs.length && !isNaN(score)) scores.set(idx, score);
+    }
+  }
+
+  if (scores.size === 0) return docs.slice(0, keep);
+
+  return docs
+    .map((doc, i) => ({ doc, score: scores.get(i) ?? 0, idx: i }))
+    .sort((a, b) => b.score - a.score || a.idx - b.idx)
+    .slice(0, keep)
+    .map((x) => x.doc);
+}
+
 // Multi-query retrieval: paraphrase the question, fan out hybrid_search
 // over each variant, union and dedupe. Keeps the best-scoring hit per doc id.
 async function multiQueryRetrieve(
@@ -111,7 +168,7 @@ async function multiQueryRetrieve(
   paraphraseChain: RunnableSequence,
   question: string,
   perQueryK: number = 8,
-  finalK: number = 12,
+  finalK: number = 15,
 ): Promise<Document[]> {
   let paraphrases: string[] = [];
   try {
@@ -196,14 +253,15 @@ export async function POST(req: NextRequest) {
     });
 
     const retrievalChain = async (question: string) => {
-      const docs = await multiQueryRetrieve(
+      const candidates = await multiQueryRetrieve(
         client,
         embeddings,
         paraphraseChain,
         question,
       );
-      resolveWithDocuments(docs);
-      return combineDocumentsFn(docs);
+      const reranked = await rerankWithLLM(model, question, candidates, 8);
+      resolveWithDocuments(reranked);
+      return combineDocumentsFn(reranked);
     };
 
     const answerChain = RunnableSequence.from([
