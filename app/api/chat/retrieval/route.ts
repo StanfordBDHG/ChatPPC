@@ -5,9 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
-import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 import { Document } from "@langchain/core/documents";
-import { RunnableSequence } from "@langchain/core/runnables";
+import { RunnableSequence, RunnableLambda } from "@langchain/core/runnables";
 import {
   BytesOutputParser,
   StringOutputParser,
@@ -45,7 +44,15 @@ const condenseQuestionPrompt = PromptTemplate.fromTemplate(
   CONDENSE_QUESTION_TEMPLATE,
 );
 
-const ANSWER_TEMPLATE = `You should answer people's questions about our clinic. Please only answer in English. Your answers should come from searching the uploaded files under Knowledge. The knowledge files are in Markdown format, and you should use the headers to identify the right information to provide. If there is a relevant link in the knowledge file, please display that link in your response. Be concise, and limit extra statements or thoughts. When searching the internet, you should preferentially include results on this website: https://med.stanford.edu/ppc.html. If you give any links, remind users that they should log in to Google with their stanford.edu email address to get access to the files.
+// Multi-query / HyDE-lite: generate a few alternative phrasings of the
+// user's question so retrieval can match documents using different
+// vocabulary (e.g. "POCT" vs "point of care testing").
+const PARAPHRASE_TEMPLATE = `You help search a medical clinic knowledge base. Rewrite the user's question in exactly 2 alternative ways that might match how the knowledge base describes the same topic. Expand ALL abbreviations and acronyms to their full spelled-out form (e.g. "POCT" -> "point of care testing", "GPCHC" -> "Gardner Packard Children's Health Center"). Vary the word choice. Keep each rewrite on a single line. Return ONLY the 2 rewrites, one per line — no numbering, no bullets, no commentary.
+
+Question: {question}`;
+const paraphrasePrompt = PromptTemplate.fromTemplate(PARAPHRASE_TEMPLATE);
+
+const ANSWER_TEMPLATE = `You should answer people's questions about our clinic. Please only answer in English. Your answers should come from searching the uploaded files under Knowledge. The knowledge files are in Markdown format, and you should use the headers to identify the right information to provide. Please always link the PPC website section where the response came from in your response to the user. If there is a relevant link in the knowledge file, please display that link in your response. Be concise, and limit extra statements or thoughts. When searching the internet, you should preferentially include results on this website: https://med.stanford.edu/ppc.html. If you give any links, remind users that they should log in to Google with their stanford.edu email address to get access to the files.
 
 If you can't find the answer to the question by searching the knowledge attached, you should state that: "The information you are requesting does not exist on the Stanford PPC site. Sometimes, ChatPPC can make mistakes though. If you think that this is an error, click on the PPC webiste link above to search the site manually. Have feedback? Be sure to use the button in the top left of the screen."
 
@@ -62,61 +69,81 @@ Question: {question}
 `;
 const answerPrompt = PromptTemplate.fromTemplate(ANSWER_TEMPLATE);
 
-/**
- * Keyword search: finds documents containing query terms via ILIKE.
- * This catches results that embedding similarity might miss, especially
- * for short documents with sparse context.
- */
-async function keywordSearch(
+type HybridRow = {
+  id: number;
+  content: string;
+  metadata: Record<string, any>;
+  similarity: number;
+};
+
+// Call the `hybrid_search` Postgres function: vector similarity + keyword
+// boost in one round trip. Defined in
+// supabase/migrations/00000000000004_hybrid_search.sql.
+async function hybridSearch(
   client: any,
+  embeddings: OpenAIEmbeddings,
   query: string,
-  limit: number = 5,
+  matchCount: number = 10,
+): Promise<Array<Document & { id: number; similarity: number }>> {
+  const queryEmbedding = await embeddings.embedQuery(query);
+  const { data, error } = await client.rpc("hybrid_search", {
+    query_embedding: queryEmbedding,
+    query_text: query,
+    match_count: matchCount,
+  });
+  if (error) {
+    console.error("hybrid_search RPC error:", error);
+    return [];
+  }
+  return ((data ?? []) as HybridRow[]).map((row) =>
+    Object.assign(
+      new Document({ pageContent: row.content, metadata: row.metadata }),
+      { id: row.id, similarity: row.similarity },
+    ),
+  );
+}
+
+// Multi-query retrieval: paraphrase the question, fan out hybrid_search
+// over each variant, union and dedupe. Keeps the best-scoring hit per doc id.
+async function multiQueryRetrieve(
+  client: any,
+  embeddings: OpenAIEmbeddings,
+  paraphraseChain: RunnableSequence,
+  question: string,
+  perQueryK: number = 8,
+  finalK: number = 12,
 ): Promise<Document[]> {
-  // Extract meaningful words (3+ chars, skip common stop words)
-  const stopWords = new Set([
-    "the", "and", "for", "are", "but", "not", "you", "all",
-    "can", "her", "was", "one", "our", "out", "how", "has",
-    "its", "let", "may", "who", "did", "get", "she", "him",
-    "his", "had", "any", "been", "from", "have", "this",
-    "that", "with", "what", "when", "where", "which", "about",
-  ]);
-  const words = query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length >= 3 && !stopWords.has(w));
+  let paraphrases: string[] = [];
+  try {
+    const raw = (await paraphraseChain.invoke({ question })) as string;
+    paraphrases = raw
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && l.length < 400)
+      .slice(0, 2);
+  } catch (e) {
+    console.error("paraphrase generation failed:", e);
+  }
 
-  if (words.length === 0) return [];
+  const queries = [question, ...paraphrases];
 
-  // Search for documents containing any of the query words
-  // Use the longest/most specific words first for better matching
-  const sortedWords = words.sort((a, b) => b.length - a.length);
+  const resultSets = await Promise.all(
+    queries.map((q) => hybridSearch(client, embeddings, q, perQueryK)),
+  );
 
-  const results: Document[] = [];
-  const seenIds = new Set<number>();
-
-  for (const word of sortedWords.slice(0, 3)) {
-    const { data, error } = await client
-      .from("documents")
-      .select("id, content, metadata")
-      .ilike("content", `%${word}%`)
-      .limit(limit);
-
-    if (!error && data) {
-      for (const row of data) {
-        if (!seenIds.has(row.id)) {
-          seenIds.add(row.id);
-          results.push(
-            new Document({
-              pageContent: row.content,
-              metadata: row.metadata,
-            }),
-          );
-        }
+  const bestById = new Map<number, Document & { similarity: number }>();
+  for (const docs of resultSets) {
+    for (const doc of docs) {
+      const existing = bestById.get((doc as any).id);
+      if (!existing || existing.similarity < doc.similarity) {
+        bestById.set((doc as any).id, doc);
       }
     }
   }
 
-  return results.slice(0, limit);
+  return Array.from(bestById.values())
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, finalK);
 }
 
 /**
@@ -141,14 +168,24 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_PRIVATE_KEY!,
     );
-    const vectorstore = new SupabaseVectorStore(new OpenAIEmbeddings(), {
-      client,
-      tableName: "documents",
-      queryName: "match_documents",
-    });
+    const embeddings = new OpenAIEmbeddings();
 
     const standaloneQuestionChain = RunnableSequence.from([
       condenseQuestionPrompt,
+      model,
+      new StringOutputParser(),
+    ]);
+
+    // Only condense when there is prior chat history. On the first turn the
+    // user's original wording (including acronyms like "POCT") is the best
+    // retrieval signal — paraphrasing it through an LLM loses exact tokens.
+    const hasChatHistory = previousMessages.length > 0;
+    const questionChain = hasChatHistory
+      ? standaloneQuestionChain
+      : RunnableLambda.from((input: any) => input.question);
+
+    const paraphraseChain = RunnableSequence.from([
+      paraphrasePrompt,
       model,
       new StringOutputParser(),
     ]);
@@ -158,54 +195,20 @@ export async function POST(req: NextRequest) {
       resolveWithDocuments = resolve;
     });
 
-    const retriever = vectorstore.asRetriever({
-      k: 10,
-      searchType: "similarity",
-      callbacks: [
-        {
-          handleRetrieverEnd(documents) {
-            resolveWithDocuments(documents);
-          },
-        },
-      ],
-    });
-
-    /**
-     * Combined retrieval: vector similarity (via LangChain) + keyword search.
-     * Merges results and deduplicates so the LLM sees the best of both.
-     */
-    const combinedRetrievalChain = async (question: string) => {
-      // Run vector and keyword searches in parallel
-      const [vectorDocs, keywordDocs] = await Promise.all([
-        retriever.invoke(question),
-        keywordSearch(client, question, 5),
-      ]);
-
-      // Merge: vector results first, then keyword results not already present
-      const seen = new Set<string>();
-      const merged: Document[] = [];
-
-      for (const doc of vectorDocs) {
-        const key = doc.pageContent.slice(0, 100);
-        if (!seen.has(key)) {
-          seen.add(key);
-          merged.push(doc);
-        }
-      }
-      for (const doc of keywordDocs) {
-        const key = doc.pageContent.slice(0, 100);
-        if (!seen.has(key)) {
-          seen.add(key);
-          merged.push(doc);
-        }
-      }
-
-      return combineDocumentsFn(merged);
+    const retrievalChain = async (question: string) => {
+      const docs = await multiQueryRetrieve(
+        client,
+        embeddings,
+        paraphraseChain,
+        question,
+      );
+      resolveWithDocuments(docs);
+      return combineDocumentsFn(docs);
     };
 
     const answerChain = RunnableSequence.from([
       {
-        context: async (input: any) => combinedRetrievalChain(input.question),
+        context: async (input: any) => retrievalChain(input.question),
         chat_history: (input: any) => input.chat_history,
         question: (input: any) => input.question,
       },
@@ -215,7 +218,7 @@ export async function POST(req: NextRequest) {
 
     const conversationalRetrievalQAChain = RunnableSequence.from([
       {
-        question: standaloneQuestionChain,
+        question: questionChain,
         chat_history: (input: any) => input.chat_history,
       },
       answerChain,
