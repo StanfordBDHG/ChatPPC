@@ -992,23 +992,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@langchain/core@npm:^0.3.31":
-  version: 0.3.68
-  resolution: "@langchain/core@npm:0.3.68"
+"@langchain/core@npm:^0.3.80":
+  version: 0.3.80
+  resolution: "@langchain/core@npm:0.3.80"
   dependencies:
     "@cfworker/json-schema": ^4.0.2
     ansi-styles: ^5.0.0
     camelcase: 6
     decamelize: 1.2.0
     js-tiktoken: ^1.0.12
-    langsmith: ^0.3.46
+    langsmith: ^0.3.67
     mustache: ^4.2.0
     p-queue: ^6.6.2
     p-retry: 4
     uuid: ^10.0.0
     zod: ^3.25.32
     zod-to-json-schema: ^3.22.3
-  checksum: 7294bf83f7f2eb91f00a9853f5ed6275aefb4c3b9c3fe9b73fe72cb04208a44a7a652ec1e27279534bb9f5c1de7f64fa3ba737ced397ba57742d33fc76f7a33a
+  checksum: b11dbcfff1f63b2db55d655867440cd69bd6bd4f21c7b0167e5eae2dcea37195a8243db93e024c8e3cddac5ac11e8771cf38b032788210eb28204e955424ea61
   languageName: node
   linkType: hard
 
@@ -5061,7 +5061,7 @@ __metadata:
   resolution: "langchain-nextjs-template@workspace:."
   dependencies:
     "@langchain/community": ^0.3.25
-    "@langchain/core": ^0.3.31
+    "@langchain/core": ^0.3.80
     "@langchain/langgraph": ^0.2.41
     "@langchain/openai": ^0.3.17
     "@next/bundle-analyzer": ^13.4.19
@@ -5210,6 +5210,34 @@ __metadata:
     openai:
       optional: true
   checksum: d200b95889b2a34a63db72e83a442bb10a8c87a304ef39f37edc5b13e4e234ae208ffa93bd0d6e4004f42096397ca48742367d0f58150238380a97dcdedf1fc6
+  languageName: node
+  linkType: hard
+
+"langsmith@npm:^0.3.67":
+  version: 0.3.87
+  resolution: "langsmith@npm:0.3.87"
+  dependencies:
+    "@types/uuid": ^10.0.0
+    chalk: ^4.1.2
+    console-table-printer: ^2.12.1
+    p-queue: ^6.6.2
+    semver: ^7.6.3
+    uuid: ^10.0.0
+  peerDependencies:
+    "@opentelemetry/api": "*"
+    "@opentelemetry/exporter-trace-otlp-proto": "*"
+    "@opentelemetry/sdk-trace-base": "*"
+    openai: "*"
+  peerDependenciesMeta:
+    "@opentelemetry/api":
+      optional: true
+    "@opentelemetry/exporter-trace-otlp-proto":
+      optional: true
+    "@opentelemetry/sdk-trace-base":
+      optional: true
+    openai:
+      optional: true
+  checksum: 30b9b076199c4201ab475440e9887da58884d4c10e0cbcee554c7cffe0c42d9169224452904400d8e6c441d715217c479865fca484d4624c30160f4df6e4b6c8
   languageName: node
   linkType: hard
 
